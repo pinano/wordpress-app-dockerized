@@ -11,9 +11,7 @@ services:
           memory: ${APP_MEMORY:-512M} # Memory limit
         reservations:
           memory: ${APP_MEMORY_RESERVATION:-128M}
-    depends_on:
-      db:
-        condition: service_healthy
+
     build:
       context: .
       dockerfile: docker/Dockerfile
@@ -66,7 +64,7 @@ services:
       PHP_FPM_PM_MAX_CHILDREN: ${PHP_FPM_PM_MAX_CHILDREN:-10}
       PHP_FPM_PM_MAX_REQUESTS: ${PHP_FPM_PM_MAX_REQUESTS:-500}
       # Database
-      DB_HOST: db
+      DB_HOST: ${DB_HOST:-db}
       DB_NAME: ${DB_NAME}
       DB_USER: ${DB_USER}
       DB_PASS: ${DB_PASS}
@@ -97,6 +95,7 @@ services:
   cron:
     image: wordpress-cron:${PHP_VERSION:-8.5}-cli
     container_name: ${PROJECT_NAME}-cron
+    profiles: [ "cron" ]
     deploy:
       resources:
         limits:
@@ -104,9 +103,6 @@ services:
           memory: ${CRON_MEMORY:-256M}
         reservations:
           memory: ${CRON_MEMORY_RESERVATION:-64M}
-    depends_on:
-      db:
-        condition: service_healthy
     build:
       context: .
       dockerfile: docker/Dockerfile.cron
@@ -140,7 +136,7 @@ services:
       PHP_MAX_EXECUTION_TIME: 0 # No limit for CLI
       PHP_MEMORY_LIMIT: ${PHP_MEMORY_LIMIT:-512M}
       # Database
-      DB_HOST: db
+      DB_HOST: ${DB_HOST:-db}
       DB_NAME: ${DB_NAME}
       DB_USER: ${DB_USER}
       DB_PASS: ${DB_PASS}
