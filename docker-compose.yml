@@ -153,6 +153,7 @@ services:
   db:
     image: mariadb:12.1.2
     container_name: ${PROJECT_NAME}-db
+    profiles: [ "db" ]
     command:
       - --default-authentication-plugin=mysql_native_password
       - --sql_mode=ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION
@@ -199,22 +200,23 @@ services:
       - backnet
 
   # --- SFTP ---
-  #sftp:
-  #  image: atmoz/sftp:alpine
-  #  container_name: ${PROJECT_NAME}-sftp
-  #  deploy:
-  #    resources:
-  #      limits:
-  #        cpus: '0.25'
-  #        memory: 128M
-  #  restart: unless-stopped
-  #  ports:
-  #    - "${SFTP_BIND_IP:-127.0.0.1}:22${PROJECT_ID}:22" # <--- Controlled by SFTP_BIND_IP and PROJECT_ID in .env
-  #  volumes:
-  #    - ./docroot:/home/${SFTP_USER}/upload
-  #  command: ${SFTP_USER}:${SFTP_PASS}:${USER_ID:-1000}:${GROUP_ID:-1000}
-  #  networks:
-  #    - backnet
+  sftp:
+    image: atmoz/sftp:alpine
+    container_name: ${PROJECT_NAME}-sftp
+    profiles: [ "sftp" ]
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+    restart: unless-stopped
+    ports:
+      - "${SFTP_BIND_IP:-127.0.0.1}:22${PROJECT_ID}:22" # <--- Controlled by SFTP_BIND_IP and PROJECT_ID in .env
+    volumes:
+      - ./docroot:/home/${SFTP_USER}/upload
+    command: ${SFTP_USER}:${SFTP_PASS}:${USER_ID:-1000}:${GROUP_ID:-1000}
+    networks:
+      - backnet
 
   # --- Optional Redis Cache (Powered by Valkey, requires COMPOSE_PROFILES=redis) ---
   redis:
@@ -249,6 +251,7 @@ services:
   wpcli:
     image: wordpress:cli
     container_name: ${PROJECT_NAME}-wpcli
+    profiles: [ "wpcli" ]
     user: ${USER_ID:-1000}:${GROUP_ID:-1000}
     volumes:
       - /etc/localtime:/etc/localtime:ro
@@ -263,7 +266,6 @@ services:
       WORDPRESS_TABLE_PREFIX: ${DB_TABLE_PREFIX:-wp_}
     networks:
       - backnet
-    profiles: [ "tools" ] # Trick: this way the container only boots when explicitly requested
 
 # --- Networks ---
 networks:
