@@ -2,7 +2,7 @@ services:
 
   # --- App ---
   app:
-    image: ${PROJECT_NAME}-app:${PHP_VERSION:-8.5}-fpm-apache
+    image: wordpress-app:${PHP_VERSION:-8.5}-fpm-apache-ffmpeg-wpcli
     container_name: ${PROJECT_NAME}-app
     deploy:
       resources:
@@ -95,7 +95,7 @@ services:
 
   # --- Cron ---
   cron:
-    image: ${PROJECT_NAME}-cron:${PHP_VERSION:-8.5}-cli
+    image: wordpress-cron:${PHP_VERSION:-8.5}-cli
     container_name: ${PROJECT_NAME}-cron
     deploy:
       resources:
