@@ -1,4 +1,4 @@
-# Makefile for Dockerized Zend Framework 1.x App
+# Makefile for Dockerized Wordpress App
 
 # Default target
 .PHONY: help
@@ -148,12 +148,8 @@ sync:
 .PHONY: logs
 logs:
 	@SERVICE="$(filter-out $@,$(MAKECMDGOALS))"; \
-	if [ "$$SERVICE" = "zend" ]; then \
-		echo "📋 Tailing Zend application log (/var/www/html/tmp/zend_error.log)..."; \
-		. ./docker/scripts/set-env-vars.sh && docker compose exec app tail -n 100 -f /var/www/html/tmp/zend_error.log; \
-	else \
-		. ./docker/scripts/set-env-vars.sh && docker compose logs -f $$SERVICE; \
-	fi
+	echo "📋 Tailing WordPress debug log (/var/www/html/public/wp-content/debug.log)..."; \
+	. ./docker/scripts/set-env-vars.sh && docker compose exec app tail -n 100 -f /var/www/html/public/wp-content/debug.log; \
 
 .PHONY: shell
 shell:

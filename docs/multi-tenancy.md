@@ -1,8 +1,8 @@
 # Multi-Tenancy on Single Host
 
-This stack is designed to be easily replicable, allowing you to host dozens of legacy Zend Framework 1.x applications on a single server without port collisions or dependency hell.
+This stack is designed to be easily replicable, allowing you to host dozens of WordPress applications on a single server without port collisions or dependency hell.
 
-## Scenario: Running 30+ Legacy ZF1 Apps
+## Scenario: Running 30+ WordPress Apps
 
 Running multiple applications on the same server requires careful resource management and a centralized router (reverse proxy) to direct traffic based on domains rather than ports.
 

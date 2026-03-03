@@ -54,7 +54,7 @@ if [ "$APP_ENV" = "development" ]; then
     export APP_ENV_PHP_OPCACHE_REVALIDATE_FREQ=0
     # display_errors=Off even in development: errors go to the log file instead
     # of being printed in the HTTP response. This avoids leaking stack traces
-    # while still capturing all errors via error_log / Zend Logger.
+    # while still capturing all errors via error_log
     export APP_ENV_PHP_DISPLAY_ERRORS="Off"
     export APP_ENV_PHP_DISPLAY_STARTUP_ERRORS="On"
 else

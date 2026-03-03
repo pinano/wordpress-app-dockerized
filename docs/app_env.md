@@ -1,6 +1,6 @@
 # Application Environment (APP_ENV)
 
-The Docker stack includes an `APP_ENV` variable in the `.env` file that controls the behavior of both the underlying web server (PHP-FPM/Apache) and your legacy Zend Framework 1.x application.
+The Docker stack includes an `APP_ENV` variable in the `.env` file that controls the behavior of both the underlying web server (PHP-FPM/Apache) and your WordPress application.
 
 ---
 
@@ -18,29 +18,20 @@ The `serversideup/php` image natively listens to `APP_ENV`:
 
 ---
 
-## 2. Integrating with Legacy ZF1 Code
+## 2. Integrating with WordPress
 
-Zend Framework 1.x is old enough that it does **not** automatically read this variable. Legacy ZF1 applications usually look for a specific constant (e.g., `APPLICATION_ENV`) defined in `public/index.php`.
+WordPress natively supports environment types via `WP_ENVIRONMENT_TYPE`.
+To ensure your WordPress site runs in the exact same mode as the Docker container, you can update your `wp-config.php`.
 
-To ensure your framework runs in the exact same mode as the Docker container (and accurately switches database configs or enables onscreen `Zend_Log`), you should update your application's entry point.
+### Updating `wp-config.php`
 
-### Updating `public/index.php`
-
-Look for the traditional `APPLICATION_ENV` definition:
-
-```php
-// Old legacy definition:
-define('APPLICATION_ENV', (getenv('APPLICATION_ENV') ? getenv('APPLICATION_ENV') : 'production'));
-```
-
-Change it to read the modern Docker variable `APP_ENV`:
+Add the following to read the modern Docker variable `APP_ENV`:
 
 ```php
-// Modernized definition reading from the Docker container:
-define('APPLICATION_ENV', (getenv('APP_ENV') ? getenv('APP_ENV') : 'production'));
+define('WP_ENVIRONMENT_TYPE', getenv('APP_ENV') ?: 'production');
 ```
 
-By making this small change, your container's `APP_ENV` variable (defined in `.env`) will act as the single source of truth, synchronizing the server's error reporting with Zend Framework's internal environment!
+By making this small change, your container's `APP_ENV` variable (defined in `.env`) will act as the single source of truth, synchronizing the server's error reporting with WordPress's internal environment!
 
 ---
 

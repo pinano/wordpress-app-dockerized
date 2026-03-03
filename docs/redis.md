@@ -1,6 +1,6 @@
-# Redis Integration with Zend Framework 1.x (Powered by Valkey)
+# Redis Integration with WordPress (Powered by Valkey)
 
-The current Docker stack includes an optional Redis-compatible service (powered by `valkey/valkey:7.2-alpine`) prepared for high-traffic environments. Valkey is a drop-in replacement for Redis that runs entirely in RAM, offering sub-millisecond response times, which is ideal for storing caches and user sessions, relieving the load on MariaDB and the hard drive. All interactions with this container use the standard Redis nomenclature and protocols.
+The current Docker stack includes an optional Redis-compatible service (powered by `valkey/valkey:7.2-alpine`) prepared for high-traffic environments. Valkey is a drop-in replacement for Redis that runs entirely in RAM, offering sub-millisecond response times, which is ideal for storing object cache and user sessions, relieving the load on MariaDB and the hard drive. All interactions with this container use the standard Redis nomenclature and protocols.
 
 ---
 
@@ -22,67 +22,41 @@ This will spin up a new container named `[PROJECT_NAME]-redis` that will only be
 
 ---
 
-## 2. Configuration in the Legacy Application (ZF1)
+## 2. Configuration in WordPress
 
-Zend Framework 1.x has the `Zend_Cache` component which can be adapted to use Redis. There are two main use cases: Application Cache and Session Handling.
+WordPress can leverage Redis for object caching and session storage to greatly improve performance.
 
-### Use Case A: Application Cache (Zend_Cache)
+### Use Case A: Object Cache (Redis Object Cache Plugin)
 
-To use Redis as a caching backend, a widely used community library called `Cm_Cache_Backend_Redis` is commonly used (very popular in Magento 1 and ZF1 ecosystems). Since Valkey is fully compatible with the Redis protocol, this works seamlessly.
+To use Redis as a caching backend, you should use a plugin such as "Redis Object Cache" or "WP Redis". 
 
-In your `application/configs/application.ini` file, the configuration to hook this backend would be as follows:
+You must define the connection parameters in your `wp-config.php`:
 
-```ini
-; Basic frontend configuration
-resources.cachemanager.general.frontend.name                            = Core
-resources.cachemanager.general.frontend.options.lifetime                = 7200
-resources.cachemanager.general.frontend.options.automatic_serialization = true
-
-; Redis backend configuration
-resources.cachemanager.general.backend.name                             = "Cm_Cache_Backend_Redis"
-
-; IMPORTANT: The server must point to the service name in the docker-compose (redis)
-resources.cachemanager.general.backend.options.server                   = "redis" 
-resources.cachemanager.general.backend.options.port                     = "6379"
-```
-
-**Usage example in a Controller/Model:**
 ```php
-$cache = clone $this->getInvokeArg('bootstrap')->getResource('cachemanager')->getCache('general');
-
-$cacheKey = 'popular_articles_list';
-
-if (!$result = $cache->load($cacheKey)) {
-    // If not in cache, perform the heavy DB query
-    $result = $model->performHeavyQuery();
-    
-    // Save in Redis for next time
-    $cache->save($result, $cacheKey);
-}
-
-return $result;
+// IMPORTANT: The server must point to the service name in the docker-compose (redis)
+define('WP_REDIS_HOST', 'redis');
+define('WP_REDIS_PORT', 6379);
+// Optional variables:
+// define('WP_REDIS_DATABASE', 0);
+// define('WP_REDIS_PASSWORD', 'your-password');
 ```
+
+Once the plugin is installed and activated, it will intercept database queries and cache the results in Redis.
 
 ### Use Case B: Session Storage (Recommended)
 
-Even if you don't want to refactor code to implement data caching, **moving user sessions to Redis** offers a massive performance improvement without needing to touch PHP code.
+Even if you use a different caching mechanism, moving user sessions to Redis offers a direct performance improvement without needing to touch application logic.
 
-By moving sessions to Redis, heavy read/write operations on disk files (`/tmp/sessions`) are avoided, taking advantage of the volatile cache in RAM.
-
-Add these directives to your `application.ini` (or uncomment them if they previously existed pointing to disk):
+Add these directives to your custom `docker/php/custom.ini` file if you want PHP to handle sessions through Redis:
 
 ```ini
-; Disable potential session saving in the database if you had it
-; resources.session.saveHandler.class = "Zend_Session_SaveHandler_DbTable"
-
 ; Configure PHP to use the native Redis extension for sessions
-phpSettings.session.save_handler = "redis"
-phpSettings.session.save_path    = "tcp://redis:6379"
+session.save_handler = redis
+session.save_path    = "tcp://redis:6379"
 
 ; Optional: Configure cookie/session lifetime
-phpSettings.session.cookie_lifetime = 86400
-phpSettings.session.gc_maxlifetime  = 86400
+session.cookie_lifetime = 86400
+session.gc_maxlifetime  = 86400
 ```
 
-With this simple configuration change, user logins and navigation will be processed instantly through the in-memory Redis service.
-
+With this simple configuration change, user data stored in $_SESSION will be processed instantly through the in-memory Redis service.

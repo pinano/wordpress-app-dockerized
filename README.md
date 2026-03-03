@@ -1,12 +1,12 @@
-# Dockerized Legacy ZF1 Application
+# Dockerized WordPress Application
 
-A modernized Docker stack for running legacy Zend Framework 1.x applications, featuring optimized performance, secure defaults, and easy management via `make`.
+A modernized Docker stack for running WordPress applications, featuring optimized performance, secure defaults, and easy management via `make`.
 
 ## Features
 - **Configurable PHP Version**: Switch between PHP versions (e.g., 5.6, 7.4, 8.1) via `.env`.
 - **MariaDB 12**: Latest stable database version.
-- **Performance Tuned**: Optimized `opcache` and `realpath_cache` settings for ZF1.
-- **Tmpfs Integration**: High-performance, ephemeral storage for ZF1 cache/sessions.
+- **Performance Tuned**: Optimized `opcache` and `realpath_cache` settings for WordPress.
+- **Tmpfs Integration**: High-performance, ephemeral storage for WordPress cache/sessions.
 - **Secure by Default**: SFTP and DB ports restricted to localhost.
 - **Traefik Ready**: Integrated labels for Traefik reverse proxy.
 - **Advanced Flexibility**: Built-in support for Redis, Xdebug, Cronjobs, and custom PHP overrides.
@@ -68,15 +68,14 @@ For detailed sizing profiles (Small/Medium/Large) and capacity planning, see the
 
 ### Advanced Stack Control
 
-You can enable additional stack features for specific legacy applications via `.env` or configuration files:
+You can enable additional stack features for specific WordPress applications via `.env` or configuration files:
 
 - **Optional Redis Cache**: Add `COMPOSE_PROFILES=redis` to your `.env` to automatically start a lightweight Redis container (powered by Valkey). **[Read the Full Redis Integration Guide here](docs/redis.md).**
 - **Xdebug for Local Dev**: Set `PHP_EXTENSION_XDEBUG=1` in your `.env`. Keep it disabled in production.
 - **Cronjobs**: Schedule application tasks without connecting to the container by adding cron syntax to `docker/scripts/crontab`. A dedicated CLI container executes them automatically. **[Read the Cronjobs Guide here](docs/cron.md).**
 - **Local PHP Overrides**: If a specific project needs an unusual PHP setting (e.g., `max_input_vars = 5000`), simply add it to `docker/php/custom.ini` without modifying the core image.
 - **Verbose Logging**: Adjust `APACHE_LOG_LEVEL=debug` (or `warn` by default) in your `.env` to troubleshoot complex HTTP errors.
-- **Application Error Logs**: ZF1 exceptions are caught by `ErrorController` and invisible in Docker logs by default. See **[Logging Guide](docs/logging.md)** for the required fix and best practices.
-
+- **Application Error Logs**: WordPress errors are caught and invisible in Docker logs by default. See **[Logging Guide](docs/logging.md)** for the required fix and best practices.
 ## Project Structure
 
 ```
@@ -106,7 +105,7 @@ You can enable additional stack features for specific legacy applications via `.
 | `make services` | List available services |
 | `make validate` | Validate `.env` against minimum requirements |
 | `make sync` | Synchronize `.env` with `.env.dist` (Add missing keys) |
-| `make logs [svr\|zend]` | Container logs (all or specific service) or Zend app log (`zend`) |
+| `make logs [svr\|wordpress]` | Container logs (all or specific service) or WordPress app log (`wordpress`) |
 | `make shell <svr>` | Access container shell (defaults to `app`) |
 | `make pull` | Pull latest images |
 | `make clean` | Clean configs and volumes (requires confirmation) |

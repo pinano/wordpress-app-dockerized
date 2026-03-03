@@ -252,11 +252,11 @@ services:
     user: ${USER_ID:-1000}:${GROUP_ID:-1000}
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      - ./docroot:/var/www/html/public
+      - ./docroot/public:/var/www/html
       - ./wp-cli.yml:/wp-cli.yml:ro
     environment:
       TZ: ${TZ}
-      WORDPRESS_DB_HOST: db-canigor-com:3306
+      WORDPRESS_DB_HOST: db:3306
       WORDPRESS_DB_NAME: ${DB_NAME}
       WORDPRESS_DB_USER: ${DB_USER}
       WORDPRESS_DB_PASSWORD: ${DB_PASS}

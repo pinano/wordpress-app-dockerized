@@ -38,5 +38,5 @@ RUN usermod -u ${USER_ID} www-data && \
 RUN install-php-extensions exif imagick gd intl
 
 # IMPORTANT: We do NOT use "USER www-data" here.
-# Leaving the user as root allows the entrypoint script to configure Apache modules
-# and symlinks. The image will automatically drop privileges to www-data for PHP-FPM.
+# Leaving the user as root allows the entrypoint script to configure
+# system-level settings. The cron daemon runs tasks as www-data via the crontab user field.

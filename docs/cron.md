@@ -34,15 +34,14 @@ Minute Hour DayOfMonth Month DayOfWeek  USERNAME  Command_To_Execute
 0 3 * * * www-data php /var/www/html/scripts/daily-report.php
 ```
 
-**2. Execute a Zend Framework database session cleanup every 15 minutes:**
+**2. Execute WP-Cron directly via CLI every 15 minutes:**
 ```text
-*/15 * * * * www-data php /var/www/html/public/index.php crontab cleanup-sessions
+*/15 * * * * www-data php /var/www/html/wp-cron.php
 ```
-*(Note: This specific example would depend on your console implementation in your ZF1 application's entrypoint).*
 
-**3. Execute a system console command (e.g., empty the ZF1 temp folder) on Sunday nights:**
+**3. Execute a system console command (e.g., empty the WP-CLI cache) on Sunday nights:**
 ```text
-0 0 * * 0 www-data rm -rf /var/www/html/tmp/cache/*
+0 0 * * 0 www-data wp cache flush --path=/var/www/html
 ```
 
 ---
