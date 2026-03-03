@@ -2,7 +2,7 @@ services:
 
   # --- App ---
   app:
-    image: ${PROJECT_NAME}-app:${PHP_VERSION:-8.4}-fpm-apache
+    image: ${PROJECT_NAME}-app:${PHP_VERSION:-8.5}-fpm-apache
     container_name: ${PROJECT_NAME}-app
     deploy:
       resources:
@@ -18,7 +18,7 @@ services:
       context: .
       dockerfile: docker/Dockerfile
       args:
-        - PHP_VERSION=${PHP_VERSION:-8.4}
+        - PHP_VERSION=${PHP_VERSION:-8.5}
         - USER_ID=${USER_ID:-1000}
         - GROUP_ID=${GROUP_ID:-1000}
     volumes:
@@ -95,7 +95,7 @@ services:
 
   # --- Cron ---
   cron:
-    image: ${PROJECT_NAME}-cron:${PHP_VERSION:-8.4}-cli
+    image: ${PROJECT_NAME}-cron:${PHP_VERSION:-8.5}-cli
     container_name: ${PROJECT_NAME}-cron
     deploy:
       resources:
@@ -111,7 +111,7 @@ services:
       context: .
       dockerfile: docker/Dockerfile.cron
       args:
-        - PHP_VERSION=${PHP_VERSION:-8.4}
+        - PHP_VERSION=${PHP_VERSION:-8.5}
         - USER_ID=${USER_ID:-1000}
         - GROUP_ID=${GROUP_ID:-1000}
     volumes:

@@ -1,6 +1,6 @@
 # Lightweight CLI image for running scheduled tasks (cron)
 # Uses serversideup/php CLI variant — no Apache, no FPM (~150-200MB lighter)
-ARG PHP_VERSION=8.4
+ARG PHP_VERSION=8.5
 
 # Choose our base image
 FROM serversideup/php:${PHP_VERSION}-cli

@@ -1,6 +1,6 @@
 # Image for running the main app
 # Declare default PHP version before FROM
-ARG PHP_VERSION=8.4
+ARG PHP_VERSION=8.5
 
 # Choose our base image
 FROM serversideup/php:${PHP_VERSION}-fpm-apache
