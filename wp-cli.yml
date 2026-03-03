@@ -1,0 +1,2 @@
+path: /var/www/html/public
+cache-dir: /tmp/.wp-cli

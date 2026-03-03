@@ -1,0 +1,24 @@
+# Git
+.git
+.gitignore
+
+# Docker configuration (we only need the Dockerfile and scripts in context, not compose files)
+docker-compose.yml
+.env
+.env.dist
+Makefile
+*.md
+docs/
+
+# Config files mounted as volumes at runtime (not needed in the image)
+docker/apache/
+docker/php/
+
+# Application and Data (Mounted as volumes, shouldn't be baked into the image)
+mariadb_data/
+docroot/
+
+# Mac / OS specific
+.DS_Store
+*.swp
+*~

@@ -1,0 +1,42 @@
+# Lightweight CLI image for running scheduled tasks (cron)
+# Uses serversideup/php CLI variant — no Apache, no FPM (~150-200MB lighter)
+ARG PHP_VERSION=8.4
+
+# Choose our base image
+FROM serversideup/php:${PHP_VERSION}-cli
+
+# Arguments coming from docker-compose to handle permissions dynamically
+ARG USER_ID
+ARG GROUP_ID
+
+# Switch to root to perform system-level configuration
+USER root
+
+# --- INSTALL CRON ---
+# The CLI image does not include cron, so we install it explicitly
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends cron && \
+    rm -rf /var/lib/apt/lists/*
+# -----------------
+
+# --- USER SYNC ---
+# 1. Update www-data UID and GID to match the host user (e.g., 1002)
+# 2. Use find to reassign ownership of existing files from the old ID (33) to the new one
+RUN usermod -u ${USER_ID} www-data && \
+    groupmod -g ${GROUP_ID} www-data && \
+    [ -d "/var/www" ] && find /var/www -user 33 -exec chown -h www-data {} \; || true
+# -----------------
+
+# --- APP INITIALIZATION ---
+# Copy the initialization script to run on startup
+# Auto-generates healthcheck.php
+#COPY docker/scripts/init-app.sh /etc/entrypoint.d/99-init-app.sh
+#RUN chmod +x /etc/entrypoint.d/99-init-app.sh
+# -----------------
+
+# Install the same PHP extensions as the main app image
+RUN install-php-extensions exif imagick gd intl
+
+# IMPORTANT: We do NOT use "USER www-data" here.
+# Leaving the user as root allows the entrypoint script to configure Apache modules
+# and symlinks. The image will automatically drop privileges to www-data for PHP-FPM.

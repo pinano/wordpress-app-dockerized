@@ -1,0 +1,274 @@
+services:
+
+  # --- App ---
+  app:
+    image: ${PROJECT_NAME}-app:${PHP_VERSION:-8.4}-fpm-apache
+    container_name: ${PROJECT_NAME}-app
+    deploy:
+      resources:
+        limits:
+          cpus: '${APP_CPUS:-1.0}' # Max cores per project (increase if heavy)
+          memory: ${APP_MEMORY:-512M} # Memory limit
+        reservations:
+          memory: ${APP_MEMORY_RESERVATION:-128M}
+    depends_on:
+      db:
+        condition: service_healthy
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        - PHP_VERSION=${PHP_VERSION:-8.4}
+        - USER_ID=${USER_ID:-1000}
+        - GROUP_ID=${GROUP_ID:-1000}
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./docker/apache/httpd.conf:/etc/apache2/vhost-templates/http.conf:ro
+      - ./docker/php/custom.ini:/usr/local/etc/php/conf.d/99-custom.ini:ro
+      - ./docker/php/zz-docker.conf:/usr/local/etc/php-fpm.d/zz-docker.conf:ro
+      - ./docroot:/var/www/html
+      - type: tmpfs
+        target: /var/www/html/tmp
+        tmpfs:
+          size: ${APP_TMPFS_SIZE:-128M}
+    environment:
+      # System
+      TZ: ${TZ}
+      USER_ID: ${USER_ID}
+      GROUP_ID: ${GROUP_ID}
+      APP_ENV: ${APP_ENV:-development}
+      LOG_OUTPUT_LEVEL: ${LOG_OUTPUT_LEVEL:-warn}
+      # Apache
+      APACHE_DOCUMENT_ROOT: ${APACHE_DOCUMENT_ROOT:-/var/www/html/public}
+      APACHE_PROXY_TIMEOUT: ${APACHE_PROXY_TIMEOUT:-1800}
+      APACHE_LOG_LEVEL: ${APACHE_LOG_LEVEL:-warn}
+      APACHE_MAX_REQUEST_WORKERS: ${APACHE_MAX_REQUEST_WORKERS:-10}
+      # PHP
+      PHP_EXTENSION_XDEBUG: ${PHP_EXTENSION_XDEBUG:-0}
+      PHP_DATE_TIMEZONE: ${TZ}
+      PHP_DISPLAY_ERRORS: ${PHP_DISPLAY_ERRORS:-${APP_ENV_PHP_DISPLAY_ERRORS:-Off}}
+      PHP_DISPLAY_STARTUP_ERRORS: ${PHP_DISPLAY_STARTUP_ERRORS:-${APP_ENV_PHP_DISPLAY_STARTUP_ERRORS:-Off}}
+      PHP_ERROR_REPORTING: ${PHP_ERROR_REPORTING:-E_ALL & ~E_NOTICE & ~E_DEPRECATED}
+      PHP_MAX_INPUT_VARS: ${PHP_MAX_INPUT_VARS:-3000}
+      PHP_POST_MAX_SIZE: ${PHP_POST_MAX_SIZE:-50M}
+      PHP_UPLOAD_MAX_FILE_SIZE: ${PHP_UPLOAD_MAX_FILE_SIZE:-10M}
+      PHP_MEMORY_LIMIT: ${PHP_MEMORY_LIMIT:-512M}
+      PHP_MAX_EXECUTION_TIME: ${PHP_MAX_EXECUTION_TIME:-60}
+      # Performance Tuning (Realpath)
+      PHP_REALPATH_CACHE_TTL: ${PHP_REALPATH_CACHE_TTL:-7200}
+      # Performance Tuning (OPcache)
+      PHP_OPCACHE_ENABLE: 1
+      PHP_OPCACHE_MEMORY_CONSUMPTION: ${PHP_OPCACHE_MEMORY_CONSUMPTION:-256}
+      PHP_OPCACHE_MAX_ACCELERATED_FILES: ${PHP_OPCACHE_MAX_ACCELERATED_FILES:-20000}
+      PHP_OPCACHE_VALIDATE_TIMESTAMPS: ${PHP_OPCACHE_VALIDATE_TIMESTAMPS:-${APP_ENV_PHP_OPCACHE_VALIDATE_TIMESTAMPS:-0}}
+      PHP_OPCACHE_REVALIDATE_FREQ: ${PHP_OPCACHE_REVALIDATE_FREQ:-${APP_ENV_PHP_OPCACHE_REVALIDATE_FREQ:-60}}
+      # PHP-FPM Pool Tuning
+      PHP_FPM_PM_MAX_CHILDREN: ${PHP_FPM_PM_MAX_CHILDREN:-10}
+      PHP_FPM_PM_MAX_REQUESTS: ${PHP_FPM_PM_MAX_REQUESTS:-500}
+      # Database
+      DB_HOST: db
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASS}
+      # Needs "Redis Object Cache" plugin in Wordpress
+      WP_REDIS_HOST: ${PROJECT_NAME}-redis
+      WP_REDIS_PORT: 6379
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -sf --max-time 5 --connect-timeout 2 http://localhost:8080/healthcheck.php -o /dev/null || exit 1" ]
+      interval: ${HEALTHCHECK_INTERVAL:-60s}
+      timeout: 10s
+      retries: 3
+      start_period: ${HEALTHCHECK_START_PERIOD:-30s}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "2"
+    restart: unless-stopped
+    networks:
+      - traefik
+      - backnet
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik"
+      - "traefik.http.services.${PROJECT_NAME}-app.loadbalancer.server.port=8080"
+
+  # --- Cron ---
+  cron:
+    image: ${PROJECT_NAME}-cron:${PHP_VERSION:-8.4}-cli
+    container_name: ${PROJECT_NAME}-cron
+    deploy:
+      resources:
+        limits:
+          cpus: '${CRON_CPUS:-0.25}'
+          memory: ${CRON_MEMORY:-256M}
+        reservations:
+          memory: ${CRON_MEMORY_RESERVATION:-64M}
+    depends_on:
+      db:
+        condition: service_healthy
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.cron
+      args:
+        - PHP_VERSION=${PHP_VERSION:-8.4}
+        - USER_ID=${USER_ID:-1000}
+        - GROUP_ID=${GROUP_ID:-1000}
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./docker/php/custom.ini:/usr/local/etc/php/conf.d/99-custom.ini:ro
+      - ./docker/scripts/crontab:/etc/cron.d/app-cron:ro
+      - ./docroot:/var/www/html
+      - type: tmpfs
+        target: /var/www/html/tmp
+        tmpfs:
+          size: ${CRON_TMPFS_SIZE:-64M}
+    environment:
+      # System
+      TZ: ${TZ}
+      USER_ID: ${USER_ID}
+      GROUP_ID: ${GROUP_ID}
+      APP_ENV: ${APP_ENV:-development}
+      LOG_OUTPUT_LEVEL: ${LOG_OUTPUT_LEVEL:-warn}
+      IS_CRON: 1
+      # PHP
+      PHP_DATE_TIMEZONE: ${TZ}
+      PHP_DISPLAY_ERRORS: ${PHP_DISPLAY_ERRORS:-${APP_ENV_PHP_DISPLAY_ERRORS:-Off}}
+      PHP_DISPLAY_STARTUP_ERRORS: ${PHP_DISPLAY_STARTUP_ERRORS:-${APP_ENV_PHP_DISPLAY_STARTUP_ERRORS:-Off}}
+      PHP_ERROR_REPORTING: ${PHP_ERROR_REPORTING:-E_ALL & ~E_NOTICE & ~E_DEPRECATED}
+      PHP_MAX_INPUT_VARS: ${PHP_MAX_INPUT_VARS:-3000}
+      PHP_MAX_EXECUTION_TIME: 0 # No limit for CLI
+      PHP_MEMORY_LIMIT: ${PHP_MEMORY_LIMIT:-512M}
+      # Database
+      DB_HOST: db
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASS}
+    command: cron -f
+    restart: unless-stopped
+    networks:
+      - backnet
+
+  # --- MariaDB ---
+  db:
+    image: mariadb:12.1.2
+    container_name: ${PROJECT_NAME}-db
+    command:
+      - --default-authentication-plugin=mysql_native_password
+      - --sql_mode=ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION
+      - --max-connections=${DB_MAX_CONNECTIONS:-100}
+      - --innodb-buffer-pool-size=${DB_INNODB_BUFFER_POOL_SIZE:-256M}
+      - --innodb-log-file-size=${DB_INNODB_LOG_FILE_SIZE:-64M}
+      - --innodb-flush-log-at-trx-commit=${DB_INNODB_FLUSH_LOG_AT_TRX_COMMIT:-2}
+      - --innodb-flush-method=O_DIRECT
+      - --skip-name-resolve
+      - --join-buffer-size=256K
+      - --sort-buffer-size=256K
+      - --tmp-table-size=32M
+      - --max-heap-table-size=32M
+    deploy:
+      resources:
+        limits:
+          cpus: '${DB_CPUS:-2.0}' # MariaDB headroom during peaks
+          memory: ${DB_MEMORY:-1G} # Strict limit to prevent infinite growth
+        reservations:
+          memory: ${DB_MEMORY_RESERVATION:-256M}
+    healthcheck:
+      test: [ "CMD", "healthcheck.sh", "--connect", "--innodb_initialized" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "2"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./mariadb_data:/var/lib/mysql
+    ports:
+      - "${DB_BIND_IP:-127.0.0.1}:33${PROJECT_ID}:3306" # <--- Controlled by DB_BIND_IP and PROJECT_ID in .env
+    environment:
+      TZ: ${TZ}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASS}
+      MARIADB_DATABASE: ${DB_NAME}
+      MARIADB_USER: ${DB_USER}
+      MARIADB_PASSWORD: ${DB_PASS}
+    restart: unless-stopped
+    networks:
+      - backnet
+
+  # --- SFTP ---
+  #sftp:
+  #  image: atmoz/sftp:alpine
+  #  container_name: ${PROJECT_NAME}-sftp
+  #  deploy:
+  #    resources:
+  #      limits:
+  #        cpus: '0.25'
+  #        memory: 128M
+  #  restart: unless-stopped
+  #  ports:
+  #    - "${SFTP_BIND_IP:-127.0.0.1}:22${PROJECT_ID}:22" # <--- Controlled by SFTP_BIND_IP and PROJECT_ID in .env
+  #  volumes:
+  #    - ./docroot:/home/${SFTP_USER}/upload
+  #  command: ${SFTP_USER}:${SFTP_PASS}:${USER_ID:-1000}:${GROUP_ID:-1000}
+  #  networks:
+  #    - backnet
+
+  # --- Optional Redis Cache (Powered by Valkey, requires COMPOSE_PROFILES=redis) ---
+  redis:
+    image: valkey/valkey:9.0.1-alpine
+    container_name: ${PROJECT_NAME}-redis
+    profiles: [ "redis" ]
+    command: valkey-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          memory: 64M
+    healthcheck:
+      test: [ "CMD", "valkey-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "2"
+    restart: unless-stopped
+    networks:
+      - backnet
+
+  # --- WP-CLI ---
+  # Run like this:
+  # docker compose run --rm wpcli -d memory_limit=512M /usr/local/bin/wp <comando>
+  wpcli:
+    image: wordpress:cli
+    container_name: ${PROJECT_NAME}-wpcli
+    user: ${USER_ID:-1000}:${GROUP_ID:-1000}
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./docroot:/var/www/html/public
+      - ./wp-cli.yml:/wp-cli.yml:ro
+    environment:
+      TZ: ${TZ}
+      WORDPRESS_DB_HOST: db-canigor-com:3306
+      WORDPRESS_DB_NAME: ${DB_NAME}
+      WORDPRESS_DB_USER: ${DB_USER}
+      WORDPRESS_DB_PASSWORD: ${DB_PASS}
+      WORDPRESS_TABLE_PREFIX: ${DB_TABLE_PREFIX:-wp_}
+    networks:
+      - backnet
+    profiles: [ "tools" ] # Trick: this way the container only boots when explicitly requested
+
+# --- Networks ---
+networks:
+  traefik:
+    external: true
+  backnet:
+    # Docker will create a distinct 'backnet' for each project
+    driver: bridge

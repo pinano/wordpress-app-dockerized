@@ -1,0 +1,18 @@
+# -----------------------------------------
+# Application Scheduled Tasks (Cronjobs)
+# -----------------------------------------
+# Define scheduled tasks below. This file is loaded automatically by the `cron` service
+# and mounted to /etc/cron.d/app-cron inside the container.
+#
+# FORMAT: Files in /etc/cron.d/ REQUIRE the username field after the schedule:
+#   minute hour day month weekday USERNAME command
+#
+# Use 'www-data' as the user to match the application's file permissions.
+#
+# To ensure logs show up in `docker compose logs cron`, redirect output to proc FD 1:
+# * * * * * www-data php /var/www/html/public/index.php crontab module action > /proc/1/fd/1 2>&1
+# 0 0 * * * www-data php /var/www/html/scripts/daily-cleanup.php > /proc/1/fd/1 2>&1
+
+# IMPORTANT: This file MUST end with a blank line (newline after the last entry).
+# Otherwise, cron may silently ignore the last scheduled task.
+
