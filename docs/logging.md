@@ -1,11 +1,12 @@
 # Logging Guide
 
-There are two types of logs to monitor in this stack:
+There are three sources of logs to monitor in this stack:
 
 | Type | Command |
 |---|---|
 | Docker container logs (Apache, PHP errors, `error_log()`) | `make logs app` |
-| WordPress debug log (`debug.log` to file) | `make logs wordpress` |
+| WordPress debug log (`WP_DEBUG_LOG`) | `make logs wordpress` |
+| All container logs combined | `make logs` |
 
 ```bash
 make logs             # follow all container logs (all services)
@@ -18,9 +19,12 @@ make logs wordpress   # tail the WordPress debug.log inside the container
 | Source | Visible in `make logs app`? | Visible in `make logs wordpress`? |
 |---|---|---|
 | Apache access log (every request + status code) | ✅ Yes | ❌ No |
-| PHP fatal / parse errors | ✅ Yes | ❌ No |
-| `error_log()` calls in PHP code | ✅ Yes | ❌ No |
+| PHP fatal / parse errors | ✅ Yes (via error forwarder) | ❌ No |
+| `error_log()` calls in PHP code | ✅ Yes (via error forwarder) | ❌ No |
 | WordPress `WP_DEBUG_LOG` writes | ❌ No | ✅ Yes |
+
+> ℹ️ PHP errors are routed to Docker logs via a `tail` forwarder process started by `init-app.sh`.
+> The actual error log file lives at `/var/www/html/tmp/php_errors.log` (tmpfs, ephemeral).
 
 ## PHP error display in development
 
@@ -32,7 +36,7 @@ To enable WordPress debugging, add the following to `wp-config.php`:
 
 ```php
 define('WP_DEBUG', true);
-define('WP_DEBUG_LOG', '/var/www/html/wp-content/debug.log');
+define('WP_DEBUG_LOG', true); // Logs to wp-content/debug.log by default
 define('WP_DEBUG_DISPLAY', false); // Keep false to hide errors from users
 ```
 
@@ -43,7 +47,7 @@ define('WP_DEBUG_DISPLAY', false); // Keep false to hide errors from users
 The WordPress application log is written to:
 
 ```
-/var/www/html/wp-content/debug.log   (inside the container)
+/var/www/html/public/wp-content/debug.log   (inside the container)
 ```
 
 To tail it in real time:

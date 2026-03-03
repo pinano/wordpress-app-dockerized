@@ -36,12 +36,12 @@ Minute Hour DayOfMonth Month DayOfWeek  USERNAME  Command_To_Execute
 
 **2. Execute WP-Cron directly via CLI every 15 minutes:**
 ```text
-*/15 * * * * www-data php /var/www/html/wp-cron.php
+*/15 * * * * www-data php /var/www/html/public/wp-cron.php
 ```
 
-**3. Execute a system console command (e.g., empty the WP-CLI cache) on Sunday nights:**
+**3. Execute a WP-CLI command (e.g., flush the object cache) on Sunday nights:**
 ```text
-0 0 * * 0 www-data wp cache flush --path=/var/www/html
+0 0 * * 0 www-data php /var/www/html/public/wp-cron.php
 ```
 
 ---

@@ -3,11 +3,11 @@
 A modernized Docker stack for running WordPress applications, featuring optimized performance, secure defaults, and easy management via `make`.
 
 ## Features
-- **Configurable PHP Version**: Switch between PHP versions (e.g., 5.6, 7.4, 8.1) via `.env`.
+- **Configurable PHP Version**: Switch between PHP versions (e.g., 8.1, 8.3, 8.5) via `.env`.
 - **MariaDB 12**: Latest stable database version.
 - **Performance Tuned**: Optimized `opcache` and `realpath_cache` settings for WordPress.
 - **Tmpfs Integration**: High-performance, ephemeral storage for WordPress cache/sessions.
-- **Secure by Default**: SFTP and DB ports restricted to localhost.
+- **Secure by Default**: DB port restricted to localhost.
 - **Traefik Ready**: Integrated labels for Traefik reverse proxy.
 - **Advanced Flexibility**: Built-in support for Redis, Xdebug, Cronjobs, and custom PHP overrides.
 - **Unified Management**: Simple `Makefile` for all common operations.
@@ -48,11 +48,10 @@ A modernized Docker stack for running WordPress applications, featuring optimize
 Configuration is managed via the `.env` file. Key variables include:
 
 - `PROJECT_NAME`: Used for container naming and network isolation.
-- `APP_ENV`: Application environment (`production` or `development`). **[Read the APP_ENV Guide here](docs/app_env.md).**
-- `PHP_VERSION`: The PHP version tag for `serversideup/php` (e.g., `7.4`).
+- `APP_ENV`: Application environment (`production` or `development`; defaults to `development`). **[Read the APP_ENV Guide here](docs/app_env.md).**
+- `PHP_VERSION`: The PHP version tag for `serversideup/php` (e.g., `8.1`, `8.5`).
 - `APACHE_DOCUMENT_ROOT`: Path to the public web root (default: `/var/www/html/public`).
 - `DB_*`: Database credentials and settings.
-- `SFTP_*`: SFTP user credentials.
 
 ### Scalability and Performance Tuning
 
@@ -76,18 +75,20 @@ You can enable additional stack features for specific WordPress applications via
 - **Local PHP Overrides**: If a specific project needs an unusual PHP setting (e.g., `max_input_vars = 5000`), simply add it to `docker/php/custom.ini` without modifying the core image.
 - **Verbose Logging**: Adjust `APACHE_LOG_LEVEL=debug` (or `warn` by default) in your `.env` to troubleshoot complex HTTP errors.
 - **Application Error Logs**: WordPress errors are caught and invisible in Docker logs by default. See **[Logging Guide](docs/logging.md)** for the required fix and best practices.
+
 ## Project Structure
 
 ```
 .
 ├── docker/            # Docker configuration files (Apache, PHP, Scripts)
 │   └── scripts/        
-│       └── init-app.sh # Bootstrapper: Rebuilds /tmp structure automatically & generates healthcheck.php
-├── docs/               # Guides (APP_ENV, Cron, Redis, Sizing)
-├── docroot/            # Application source code
+│       └── init-app.sh # Bootstrapper: PHP error forwarder, healthcheck.php, cron env injection
+├── docs/               # Guides (APP_ENV, Cron, Redis, Sizing, Logging, Storage)
+├── docroot/            # WordPress source code (public/ contains WP core)
 ├── mariadb_data/       # Persistent database storage
 ├── .env                # Environment variables
 ├── docker-compose.yml  # Container orchestration config
+├── wp-cli.yml          # WP-CLI configuration
 └── Makefile            # Command task runner
 ```
 
@@ -109,13 +110,13 @@ You can enable additional stack features for specific WordPress applications via
 | `make shell <svr>` | Access container shell (defaults to `app`) |
 | `make pull` | Pull latest images |
 | `make clean` | Clean configs and volumes (requires confirmation) |
-| `make db` | Wait for MariaDB console, or use `import`/`export` |
+| `make db` | MariaDB console, or use `import`/`export` |
 | `make config` | Validate Docker Compose config |
+| `make php-info` | Show active PHP configuration in the container |
 | `make ctop` | Monitor containers using ctop |
 | `make open-ports` | Expose DB & SFTP ports externally (0.0.0.0) |
 | `make close-ports` | Restrict DB & SFTP ports (127.0.0.1) |
 | `make open-db` / `close-db` | Expose or restrict only the DB |
-| `make open-sftp` / `close-sftp` | Expose or restrict only SFTP |
 | `make redis-info` | Show Redis server statistics |
 | `make redis-monitor`| Monitor Redis commands in real-time |
 | `make redis-ping`   | Ping Redis server |
@@ -130,5 +131,5 @@ You can enable additional stack features for specific WordPress applications via
 - **app**: PHP-FPM + Apache (serversideup/php image).
 - **cron**: CLI container to run scheduled tasks.
 - **db**: MariaDB 12.1.2.
-- **sftp**: Secure file transfer (atmoz/sftp), restricted to localhost.
 - **redis** (Optional): In-memory cache store (Powered by Valkey).
+- **wpcli** (On-demand): WordPress CLI tools. Run via `docker compose run --rm wpcli ...`.
