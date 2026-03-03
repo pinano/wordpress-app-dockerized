@@ -3,7 +3,7 @@
 ARG PHP_VERSION=8.5
 
 # Choose our base image
-FROM serversideup/php:${PHP_VERSION}-fpm-apache
+FROM serversideup/php:${PHP_VERSION}-fpm-apache-ffmpeg-wpcli
 
 # Arguments coming from docker-compose to handle permissions dynamically
 ARG USER_ID
