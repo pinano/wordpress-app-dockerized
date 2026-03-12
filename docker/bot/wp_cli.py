@@ -32,6 +32,7 @@ def run(
         config.WP_CLI_PATH,
         *wp_args,
         "--allow-root",  # harmless when already www-data, required if root
+        "--skip-themes", # speeds up WP-CLI boots significantly
         "--path=/var/www/html/public",
     ]
 

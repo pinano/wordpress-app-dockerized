@@ -3,12 +3,18 @@
 
 FROM python:3.13-slim
 
-# Install system dependencies: ffmpeg for media processing, curl for healthcheck
+# Install system dependencies: ffmpeg for media processing, curl for healthcheck/downloads
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ffmpeg \
         curl \
     && rm -rf /var/lib/apt/lists/*
+
+# Install static Docker CLI (needed to run wp-cli via docker exec)
+ENV DOCKERVERSION=27.3.1
+RUN curl -fsSLO https://download.docker.com/linux/static/stable/$(uname -m)/docker-${DOCKERVERSION}.tgz \
+  && tar xzvf docker-${DOCKERVERSION}.tgz --strip 1 -C /usr/local/bin docker/docker \
+  && rm docker-${DOCKERVERSION}.tgz
 
 WORKDIR /app
 

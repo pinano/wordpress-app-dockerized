@@ -2,7 +2,7 @@ services:
 
   # --- App ---
   app:
-    image: wordpress-app:${PHP_VERSION:-8.5}-fpm-apache-ffmpeg-wpcli
+    image: wordpress-app:${PHP_VERSION:-8.5}-fpm-apache-wpcli
     container_name: ${PROJECT_NAME}-app
     deploy:
       resources:

@@ -39,11 +39,6 @@ RUN curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli
 RUN mkdir -p /var/www/.wp-cli/cache && \
     chown -R www-data:www-data /var/www/.wp-cli
 
-# Install FFmpeg for media processing
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
 
 # IMPORTANT: We do NOT use "USER www-data" here.
 # Leaving the user as root allows the entrypoint script to configure Apache modules

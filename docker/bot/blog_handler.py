@@ -22,6 +22,7 @@ from telegram import (
     ReplyKeyboardMarkup,
     ReplyKeyboardRemove,
     Update,
+    constants,
 )
 from telegram.ext import (
     CommandHandler,
@@ -43,7 +44,7 @@ TITLE, CONTENT, MEDIA, DONE = range(4)
 STRING_SKIP = "SALTAR"
 STRING_ENTER_TITLE = "Título de la entrada"
 STRING_ENTER_EXCERPT = "Texto de la entrada (o pulsa SALTAR)"
-STRING_UPLOAD_MEDIA = "Envía imagen o vídeo (o pulsa SALTAR)"
+STRING_UPLOAD_MEDIA = "Envía imagen, vídeo o audio (obligatorio)"
 
 SKIP_KEYBOARD = ReplyKeyboardMarkup(
     [[KeyboardButton(STRING_SKIP)]],
@@ -163,6 +164,8 @@ async def handle_title(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         await update.message.reply_text(STRING_ENTER_TITLE, reply_markup=REMOVE_KEYBOARD)
         return TITLE
 
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=constants.ChatAction.TYPING)
+
     try:
         wp_user = _wp_user(user_id)
     except ValueError as exc:
@@ -203,6 +206,7 @@ async def handle_content(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     post_id = data["post_id"]
 
     if text and text != STRING_SKIP:
+        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=constants.ChatAction.TYPING)
         try:
             wp_cli.run(
                 "post", "update", post_id,
@@ -215,7 +219,7 @@ async def handle_content(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
         data["content"] = text
 
-    await update.message.reply_text(STRING_UPLOAD_MEDIA, reply_markup=SKIP_KEYBOARD)
+    await update.message.reply_text(STRING_UPLOAD_MEDIA, reply_markup=REMOVE_KEYBOARD)
     return MEDIA
 
 
@@ -230,17 +234,16 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     text = msg.text.strip() if msg.text else ""
     msg_type = _media_type(msg)
 
-    # ── SALTAR ──────────────────────────────────────────────────────────────
-    if text == STRING_SKIP or (not msg_type and not text):
-        # No media — just finish
-        return await _finish(update, context)
-
+    # ── VERIFICAR MEDIO OBLIGATORIO ─────────────────────────────────────────
     if not msg_type:
         await update.message.reply_text(
-            "Tipo de archivo no reconocido. " + STRING_UPLOAD_MEDIA,
-            reply_markup=SKIP_KEYBOARD,
+            "⚠️ Se requiere adjuntar un archivo. " + STRING_UPLOAD_MEDIA,
+            reply_markup=REMOVE_KEYBOARD,
         )
         return MEDIA
+
+    status_msg = await update.message.reply_text("⏳ Descargando y procesando archivo, esto puede tardar unos segundos...", reply_markup=REMOVE_KEYBOARD)
+    data["status_msg_id"] = status_msg.message_id
 
     # ── Download ─────────────────────────────────────────────────────────────
     try:
@@ -284,6 +287,7 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 
             data["post_type"] = "image"
             data["media_id"] = media_id
+            data["thumb_local_path"] = local_full_path
         except Exception as exc:
             logger.exception("Photo import failed: %s", exc)
             data["post_type"] = "Error importing photo."
@@ -329,6 +333,10 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
                 "--porcelain",
             )
 
+            # Assign the thumbnail to the video attachment so it shows up in the Media Grid
+            if thumbnail_id and thumbnail_id.isdigit():
+                wp_cli.run("post", "meta", "set", media_id, "_thumbnail_id", thumbnail_id)
+
             # 5. Build video URL and thumbnail URL for the [video] shortcode
             media_url = wp_cli.run("post", "get", media_id, "--field=guid")
             thumbnail_url = wp_cli.run("post", "get", thumbnail_id, "--field=guid")
@@ -342,11 +350,10 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
             video_basename = video_file_name.split("/")[-1] if video_file_name else ""
             video_url = stripped_dir + video_basename
 
-            thumb_file_name = wp_cli.run(
-                "post", "meta", "pluck", thumbnail_id,
-                "_wp_attachment_metadata", "sizes", "medium", "file",
-            )
-            thumb_url = stripped_dir + (thumb_file_name or "")
+            # Get the full size thumbnail file (the uploaded original)
+            thumb_file_name = wp_cli.run("post", "meta", "get", thumbnail_id, "_wp_attached_file")
+            thumb_basename = thumb_file_name.split("/")[-1] if thumb_file_name else ""
+            thumb_url = stripped_dir + thumb_basename
 
             # 6. Update post content with [video] shortcode
             shortcode = f"[video src='{video_url}' poster='{thumb_url}']"
@@ -355,6 +362,7 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 
             data["post_type"] = "video"
             data["media_id"] = f"{media_id} (thumb_id = {thumbnail_id})"
+            data["thumb_local_path"] = thumb_path
         except Exception as exc:
             logger.exception("Video import failed: %s", exc)
             data["post_type"] = "Error processing video."
@@ -435,12 +443,55 @@ async def _finish(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     except Exception:
         post_url = "(URL no disponible)"
 
-    lines = [post_url or "(sin URL)"]
-    for key in ("title", "content", "post_type", "post_category", "media_id", "file"):
-        if key in data:
-            lines.append(f"\n{key}: {data[key]}")
+    lines = ["✅ <b>Entrada publicada con éxito</b>"]
+    if post_url:
+        lines.append(f"🔗 <a href='{post_url}'>Ver entrada</a>\n")
 
-    await update.message.reply_text("\n".join(lines), reply_markup=REMOVE_KEYBOARD)
+    lines.append(f"📌 <b>Post ID:</b> {post_id}")
+    if data.get("title"):
+        lines.append(f"📝 <b>Título:</b> {data['title']}")
+    if data.get("content"):
+        lines.append(f"💬 <b>Extracto:</b> {data['content']}")
+    if data.get("post_category"):
+        lines.append(f"📂 <b>Categoría:</b> {data['post_category']}")
+    if data.get("post_type"):
+        lines.append(f"📎 <b>Medio:</b> {data['post_type']}")
+    if data.get("media_id"):
+        lines.append(f"🆔 <b>Media ID:</b> {data['media_id']}")
+
+    msg_text = "\n".join(lines)
+
+    # Clean up the temporary status message
+    if "status_msg_id" in data:
+        try:
+            await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=data["status_msg_id"])
+        except Exception:
+            pass
+
+    if data.get("thumb_local_path") and os.path.exists(data["thumb_local_path"]):
+        try:
+            with open(data["thumb_local_path"], "rb") as photo_file:
+                await update.message.reply_photo(
+                    photo=photo_file,
+                    caption=msg_text,
+                    parse_mode="HTML",
+                    reply_markup=REMOVE_KEYBOARD
+                )
+        except Exception as exc:
+            logger.warning("No se pudo enviar la foto con reply_photo, cayendo fallback a reply_text: %s", exc)
+            await update.message.reply_text(
+                msg_text,
+                parse_mode="HTML",
+                disable_web_page_preview=True,
+                reply_markup=REMOVE_KEYBOARD
+            )
+    else:
+        await update.message.reply_text(
+            msg_text,
+            parse_mode="HTML",
+            disable_web_page_preview=True,
+            reply_markup=REMOVE_KEYBOARD
+        )
 
     _clear_data(context)
     return ConversationHandler.END
