@@ -1,0 +1,31 @@
+# Telegram Bot container
+# Python-based, uses python-telegram-bot (long-polling) + ffmpeg for media processing
+
+FROM python:3.13-slim
+
+# Install system dependencies: ffmpeg for media processing, curl for healthcheck
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ffmpeg \
+        curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install Python dependencies (layer-cached before copying source)
+COPY docker/bot/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application source
+COPY docker/bot/ .
+
+# Create working directories
+RUN mkdir -p /var/bot-media/photos \
+             /var/bot-media/videos \
+             /var/bot-media/animations \
+             /var/bot-media/audio \
+             /var/bot-media/voice \
+             /var/bot-media/documents \
+             /var/bot-media/thumbnails
+
+CMD ["python", "-u", "bot.py"]

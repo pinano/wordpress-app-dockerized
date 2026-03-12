@@ -25,6 +25,7 @@ services:
       - ./docker/php/custom.ini:/usr/local/etc/php/conf.d/99-custom.ini:ro
       - ./docker/php/zz-docker.conf:/usr/local/etc/php-fpm.d/zz-docker.conf:ro
       - ./docroot:/var/www/html
+      - bot-media:/var/bot-media
       - type: tmpfs
         target: /var/www/html/tmp
         tmpfs:
@@ -90,6 +91,43 @@ services:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik"
       - "traefik.http.services.${PROJECT_NAME}-app.loadbalancer.server.port=8080"
+
+  # --- Telegram Bot ---
+  bot:
+    image: telegram-bot:latest
+    container_name: ${PROJECT_NAME}-bot
+    profiles: [ "bot" ]
+    deploy:
+      resources:
+        limits:
+          cpus: '${BOT_CPUS:-0.25}'
+          memory: ${BOT_MEMORY:-256M}
+        reservations:
+          memory: ${BOT_MEMORY_RESERVATION:-64M}
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.bot
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - bot-media:/var/bot-media
+    environment:
+      TZ: ${TZ}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      BOT_ALLOWED_USERS: ${BOT_ALLOWED_USERS}
+      BOT_WP_USER_MAP: ${BOT_WP_USER_MAP}
+      BOT_CONTAINER_NAME: ${PROJECT_NAME}-app
+      BOT_DOWNLOAD_PATH: /var/bot-media
+      BOT_WP_CLI_PATH: /usr/local/bin/wp
+      BOT_FFMPEG_PATH: /usr/bin/ffmpeg
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "2"
+    restart: unless-stopped
+    networks:
+      - backnet
 
   # --- Cron ---
   cron:
@@ -270,3 +308,9 @@ networks:
   backnet:
     # Docker will create a distinct 'backnet' for each project
     driver: bridge
+
+# --- Volumes ---
+volumes:
+  bot-media:
+    # Shared between the bot container (ffmpeg processing) and the app container (wp-cli import)
+    driver: local
