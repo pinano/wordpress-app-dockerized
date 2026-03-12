@@ -9,13 +9,20 @@ import os
 from telegram.ext import Application, CommandHandler
 
 import config
-from blog_handler import build_blog_conversation_handler
+from blog_handler import (
+    ayuda_command,
+    build_blog_conversation_handler,
+    deshacer_command,
+)
 
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     level=logging.INFO,
 )
 logger = logging.getLogger(__name__)
+
+# Silence noisy httpx logs
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 async def start(update, context) -> None:
@@ -33,8 +40,12 @@ def main() -> None:
         .build()
     )
 
-    # /start
+    # /start & /ayuda
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("ayuda", ayuda_command))
+
+    # /deshacer
+    app.add_handler(CommandHandler("deshacer", deshacer_command))
 
     # /blog conversation
     app.add_handler(build_blog_conversation_handler())

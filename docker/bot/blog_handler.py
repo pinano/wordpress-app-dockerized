@@ -40,6 +40,7 @@ logger = logging.getLogger(__name__)
 
 # ── Conversation states ──────────────────────────────────────────────────────
 TITLE, CONTENT, MEDIA, DONE = range(4)
+TITLE, CONTENT, LOCATION_STATE, MEDIA = range(4)
 
 STRING_SKIP = "SALTAR"
 STRING_ENTER_TITLE = "Título de la entrada"
@@ -219,6 +220,46 @@ async def handle_content(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
         data["content"] = text
 
+    await update.message.reply_text("🗺️ Envía una Ubicación (GPS) o pulsa SALTAR", reply_markup=SKIP_KEYBOARD)
+    return LOCATION_STATE
+
+async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """State LOCATION_STATE — receive a location (or SALTAR)."""
+    data = _get_data(context)
+    post_id = data["post_id"]
+    msg = update.message
+    
+    if msg.location:
+        lat = msg.location.latitude
+        lon = msg.location.longitude
+        map_url = f"https://www.google.com/maps?q={lat},{lon}"
+        
+        current_content = data.get("content", "")
+        loc_wp = f"<p><a href='{map_url}' target='_blank'>📍 Ver ubicación</a></p>"
+        loc_tg = f"<a href='{map_url}' target='_blank'>📍 Ver ubicación</a>"
+        
+        new_excerpt_wp = f"{current_content}\n\n{loc_wp}".strip()
+        new_excerpt_tg = f"{current_content}\n\n{loc_tg}".strip()
+        
+        try:
+            # Update ONLY the excerpt with the location link
+            wp_cli.run("post", "update", post_id, f"--post_excerpt={new_excerpt_wp}")
+            
+            # Save for Telegram summary
+            data["content_tg"] = new_excerpt_tg
+            
+            # The actual WP content remains purely the text from Step 2
+            data["content_wp"] = current_content
+
+            # Keep post_type untouched as it will be filled by actual media.
+        except Exception as exc:
+            logger.exception("Location update failed: %s", exc)
+    elif msg.text and msg.text.strip() == STRING_SKIP:
+        pass
+    else:
+        await update.message.reply_text("⚠️ Por favor, envía una Ubicación o pulsa SALTAR.", reply_markup=SKIP_KEYBOARD)
+        return LOCATION_STATE
+
     await update.message.reply_text(STRING_UPLOAD_MEDIA, reply_markup=REMOVE_KEYBOARD)
     return MEDIA
 
@@ -242,7 +283,7 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         )
         return MEDIA
 
-    status_msg = await update.message.reply_text("⏳ Descargando y procesando archivo, esto puede tardar unos segundos...", reply_markup=REMOVE_KEYBOARD)
+    status_msg = await update.message.reply_text("⏳ Descargando y procesando, esto puede tardar unos segundos...", reply_markup=REMOVE_KEYBOARD)
     data["status_msg_id"] = status_msg.message_id
 
     # ── Download ─────────────────────────────────────────────────────────────
@@ -311,7 +352,9 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
                 "--preserve-filetime",
                 "--porcelain",
             )
+            # Guardamos el thumbnail_id crudo para /deshacer
             if thumbnail_id and thumbnail_id.isdigit():
+                data["raw_thumbnail_id"] = thumbnail_id
                 wp_cli.run("post", "meta", "set", post_id, "_thumbnail_id", thumbnail_id)
 
             # 3. MOV → MP4 if needed
@@ -357,7 +400,9 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 
             # 6. Update post content with [video] shortcode
             shortcode = f"[video src='{video_url}' poster='{thumb_url}']"
-            wp_cli.run("post", "update", post_id, f"--post_content={shortcode}")
+            current_wp = data.get("content_wp", data.get("content", ""))
+            new_content = f"{current_wp}\n\n{shortcode}".strip()
+            wp_cli.run("post", "update", post_id, f"--post_content={new_content}")
             wp_cli.run("post", "term", "set", post_id, "post_format", "post-format-video", "--by=slug")
 
             data["post_type"] = "video"
@@ -386,8 +431,10 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
             )
             media_url = wp_cli.run("post", "get", media_id, "--field=guid")
             stripped = media_url.split(":", 1)[1] if media_url and ":" in media_url else media_url or ""
-            content = f'<audio controls><source src="{stripped}" type="audio/mpeg"></audio>'
-            wp_cli.run("post", "update", post_id, f"--post_content={content}")
+            audio_tag = f'<audio controls><source src="{stripped}" type="audio/mpeg"></audio>'
+            current_wp = data.get("content_wp", data.get("content", ""))
+            new_content = f"{current_wp}\n\n{audio_tag}".strip()
+            wp_cli.run("post", "update", post_id, f"--post_content={new_content}")
             wp_cli.run("post", "term", "set", post_id, "post_format", "post-format-audio", "--by=slug")
 
             data["post_type"] = "audio"
@@ -450,7 +497,9 @@ async def _finish(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     lines.append(f"📌 <b>Post ID:</b> {post_id}")
     if data.get("title"):
         lines.append(f"📝 <b>Título:</b> {data['title']}")
-    if data.get("content"):
+    if data.get("content_tg"):
+        lines.append(f"💬 <b>Extracto:</b> {data['content_tg']}")
+    elif data.get("content"):
         lines.append(f"💬 <b>Extracto:</b> {data['content']}")
     if data.get("post_category"):
         lines.append(f"📂 <b>Categoría:</b> {data['post_category']}")
@@ -493,9 +542,89 @@ async def _finish(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             reply_markup=REMOVE_KEYBOARD
         )
 
+    # Guardar en last_published para el comando /deshacer
+    context.user_data["last_published"] = {
+        "post_id": post_id,
+        "media_id": data.get("media_id", "").split()[0] if data.get("media_id") else None, # Puede traer texto extra en videos
+        "thumbnail_id": data.get("raw_thumbnail_id")
+    }
+
     _clear_data(context)
     return ConversationHandler.END
 
+
+# ── Standalone Commands ───────────────────────────────────────────────────────
+
+async def ayuda_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Envía un mensaje de ayuda explicando las funcionalidades."""
+    help_text = (
+        "🤖 <b>Menú de Ayuda del Bot</b>\n\n"
+        "Comandos disponibles:\n"
+        "• /blog - Inicia el asistente paso a paso para publicar una nueva entrada.\n"
+        "• /deshacer - Elimina por completo (de WordPress y tu servidor) la última entrada que acabas de publicar, incluyendo sus fotos o vídeos.\n"
+        "• /ayuda - Muestra este mensaje.\n\n"
+        "📝 <b>Cómo publicar:</b>\n"
+        "1. Escribe el <b>Título</b> (obligatorio)\n"
+        "2. Escribe el <b>Texto/Extracto</b> (o pulsa SALTAR)\n"
+        "3. Envía una <b>Ubicación (GPS)</b> (o pulsa SALTAR)\n"
+        "4. Envía un <b>Medio</b> (obligatorio): Puede ser una Foto, Vídeo, Nota de voz o Archivo.\n\n"
+        "<i>Nota: Los vídeos pesados pueden tardar unos segundos en procesarse para generar su formato óptimo web y carátula.</i>"
+    )
+    await update.message.reply_text(help_text, parse_mode="HTML")
+
+
+async def deshacer_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Elimina permanentemente el último post creado por este bot y sus medios asociados."""
+    user_id = update.effective_user.id
+    if not _allowed(user_id):
+        await update.message.reply_text("⛔ No tienes permiso para usar este comando.")
+        return
+
+    last_pub = context.user_data.get("last_published")
+    if not last_pub or not last_pub.get("post_id"):
+        await update.message.reply_text("❌ No se ha encontrado ninguna publicación reciente para deshacer.")
+        return
+
+    status_msg = await update.message.reply_text("🗑️ Eliminando contenido de WordPress...")
+    
+    deleted_items = []
+    
+    # Borrar thumbnail auxiliar de vídeo (si existe)
+    if last_pub.get("thumbnail_id"):
+        try:
+            wp_cli.run("post", "delete", last_pub["thumbnail_id"], "--force")
+            deleted_items.append("miniatura")
+        except Exception as exc:
+            logger.warning("Fallo al borrar thumbnail_id %s: %s", last_pub["thumbnail_id"], exc)
+
+    # Borrar medio adjunto (foto, vídeo, audio)
+    if last_pub.get("media_id") and last_pub["media_id"].isdigit():
+        try:
+            wp_cli.run("post", "delete", last_pub["media_id"], "--force")
+            deleted_items.append("medio")
+        except Exception as exc:
+            logger.warning("Fallo al borrar media_id %s: %s", last_pub["media_id"], exc)
+
+    # Borrar el post principal
+    try:
+        wp_cli.run("post", "delete", last_pub["post_id"], "--force")
+        deleted_items.append("entrada principal")
+    except Exception as exc:
+        logger.exception("Fallo al borrar post_id %s: %s", last_pub["post_id"], exc)
+        await status_msg.edit_text("❌ Ocurrió un error al intentar eliminar la entrada.")
+        return
+
+    # Limpiar caché WP Rocket
+    try:
+        wp_cli.run("rocket", "clean", "--confirm", "--path=/var/www/html/public/")
+    except Exception:
+        pass
+
+    # Limpiar estado para evitar doble borrado
+    context.user_data.pop("last_published", None)
+
+    items_str = ", ".join(deleted_items)
+    await status_msg.edit_text(f"✅ <b>Deshecho con éxito.</b>\nSe ha eliminado: {items_str}.", parse_mode="HTML")
 
 # ── Build the ConversationHandler ─────────────────────────────────────────────
 
@@ -508,7 +637,6 @@ MEDIA_FILTER = (
     | filters.TEXT
 )
 
-
 def build_blog_conversation_handler() -> ConversationHandler:
     return ConversationHandler(
         entry_points=[CommandHandler("blog", blog_start)],
@@ -518,6 +646,9 @@ def build_blog_conversation_handler() -> ConversationHandler:
             ],
             CONTENT: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_content),
+            ],
+            LOCATION_STATE: [
+                MessageHandler((filters.LOCATION | filters.TEXT) & ~filters.COMMAND, handle_location),
             ],
             MEDIA: [
                 MessageHandler(MEDIA_FILTER & ~filters.COMMAND, handle_media),
