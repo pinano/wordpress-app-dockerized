@@ -211,7 +211,6 @@ async def handle_content(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         try:
             wp_cli.run(
                 "post", "update", post_id,
-                f"--post_content={text}",
                 f"--post_excerpt={text}",
             )
         except Exception as exc:
@@ -400,9 +399,7 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 
             # 6. Update post content with [video] shortcode
             shortcode = f"[video src='{video_url}' poster='{thumb_url}']"
-            current_wp = data.get("content_wp", data.get("content", ""))
-            new_content = f"{current_wp}\n\n{shortcode}".strip()
-            wp_cli.run("post", "update", post_id, f"--post_content={new_content}")
+            wp_cli.run("post", "update", post_id, f"--post_content={shortcode}")
             wp_cli.run("post", "term", "set", post_id, "post_format", "post-format-video", "--by=slug")
 
             data["post_type"] = "video"
@@ -432,9 +429,7 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
             media_url = wp_cli.run("post", "get", media_id, "--field=guid")
             stripped = media_url.split(":", 1)[1] if media_url and ":" in media_url else media_url or ""
             audio_tag = f'<audio controls><source src="{stripped}" type="audio/mpeg"></audio>'
-            current_wp = data.get("content_wp", data.get("content", ""))
-            new_content = f"{current_wp}\n\n{audio_tag}".strip()
-            wp_cli.run("post", "update", post_id, f"--post_content={new_content}")
+            wp_cli.run("post", "update", post_id, f"--post_content={audio_tag}")
             wp_cli.run("post", "term", "set", post_id, "post_format", "post-format-audio", "--by=slug")
 
             data["post_type"] = "audio"
