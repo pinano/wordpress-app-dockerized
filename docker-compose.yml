@@ -254,7 +254,7 @@ services:
 
   # --- Optional Redis Cache (Powered by Valkey, requires COMPOSE_PROFILES=redis) ---
   redis:
-    image: valkey/valkey:9.0.1-alpine
+    image: valkey/valkey:9.0.3-alpine
     container_name: ${PROJECT_NAME}-redis
     profiles: [ "redis" ]
     command: valkey-server --maxmemory 128mb --maxmemory-policy allkeys-lru

@@ -1,6 +1,6 @@
 # Redis Integration with WordPress (Powered by Valkey)
 
-The current Docker stack includes an optional Redis-compatible service (powered by `valkey/valkey:9.0.1-alpine`) prepared for high-traffic environments. Valkey is a drop-in replacement for Redis that runs entirely in RAM, offering sub-millisecond response times, which is ideal for storing object cache and user sessions, relieving the load on MariaDB and the hard drive. All interactions with this container use the standard Redis nomenclature and protocols.
+The current Docker stack includes an optional Redis-compatible service (powered by `valkey/valkey:9.0.3-alpine`) prepared for high-traffic environments. Valkey is a drop-in replacement for Redis that runs entirely in RAM, offering sub-millisecond response times, which is ideal for storing object cache and user sessions, relieving the load on MariaDB and the hard drive. All interactions with this container use the standard Redis nomenclature and protocols.
 
 ---
 
