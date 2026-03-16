@@ -122,6 +122,24 @@ async def handle_date_input(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         await status_msg.edit_text("❌ Error al actualizar la fecha en WordPress.")
         return ConversationHandler.END
 
+    # Update dates on associated media attachments (non-fatal)
+    media_ids_to_update: list[str] = []
+    if last_pub.get("media_id") and str(last_pub["media_id"]).isdigit():
+        media_ids_to_update.append(str(last_pub["media_id"]))
+    if last_pub.get("thumbnail_id") and str(last_pub["thumbnail_id"]).isdigit():
+        media_ids_to_update.append(str(last_pub["thumbnail_id"]))
+
+    for mid in media_ids_to_update:
+        try:
+            wp_cli.run(
+                "post", "update", mid,
+                f"--post_date={post_date_str}",
+                f"--post_date_gmt={post_date_gmt_str}",
+            )
+            logger.info("Updated date for attachment %s", mid)
+        except Exception as exc:
+            logger.warning("Could not update date for attachment %s (non-fatal): %s", mid, exc)
+
     # Clean WP Rocket cache
     try:
         wp_cli.run("rocket", "clean", "--confirm", "--path=/var/www/html/public/")
