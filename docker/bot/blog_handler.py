@@ -556,6 +556,7 @@ async def ayuda_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         "🤖 <b>Menú de Ayuda del Bot</b>\n\n"
         "Comandos disponibles:\n"
         "• /blog - Inicia el asistente paso a paso para publicar una nueva entrada.\n"
+        "• /fecha - Cambia la fecha de publicación de la última entrada publicada.\n"
         "• /deshacer - Elimina por completo (de WordPress y tu servidor) la última entrada que acabas de publicar, incluyendo sus fotos o vídeos.\n"
         "• /ayuda - Muestra este mensaje.\n\n"
         "📝 <b>Cómo publicar:</b>\n"

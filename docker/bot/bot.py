@@ -14,6 +14,7 @@ from blog_handler import (
     build_blog_conversation_handler,
     deshacer_command,
 )
+from fecha_handler import build_fecha_conversation_handler
 
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -46,6 +47,9 @@ def main() -> None:
 
     # /deshacer
     app.add_handler(CommandHandler("deshacer", deshacer_command))
+
+    # /fecha conversation
+    app.add_handler(build_fecha_conversation_handler())
 
     # /blog conversation
     app.add_handler(build_blog_conversation_handler())
