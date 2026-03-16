@@ -222,7 +222,7 @@ db: _ensure_env
 		exit 1; \
 	else \
 		echo "🔌 Connecting to database..."; \
-		. ./docker/scripts/set-env-vars.sh && docker compose exec db sh -c 'MYSQL_PWD=$${MARIADB_PASSWORD} mariadb -u $${MARIADB_USER} $${MARIADB_DATABASE}'; \
+		. ./docker/scripts/set-env-vars.sh && docker compose exec -T db sh -c 'MYSQL_PWD=$${MARIADB_PASSWORD} mariadb -u $${MARIADB_USER} $${MARIADB_DATABASE}'; \
 	fi
 
 .PHONY: ctop
