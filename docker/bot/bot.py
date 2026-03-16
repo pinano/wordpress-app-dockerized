@@ -11,8 +11,8 @@ from telegram.ext import Application, CommandHandler
 import config
 from blog_handler import (
     ayuda_command,
+    borrar_command,
     build_blog_conversation_handler,
-    deshacer_command,
 )
 from fecha_handler import build_fecha_conversation_handler
 
@@ -45,8 +45,8 @@ def main() -> None:
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("ayuda", ayuda_command))
 
-    # /deshacer
-    app.add_handler(CommandHandler("deshacer", deshacer_command))
+    # /borrar
+    app.add_handler(CommandHandler("borrar", borrar_command))
 
     # /fecha conversation
     app.add_handler(build_fecha_conversation_handler())

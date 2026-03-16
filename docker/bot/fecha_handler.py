@@ -5,6 +5,7 @@ Allows changing the publication date of the last post created by the bot.
 The user sends the date as free text in the format DD/MM/YYYY HH:MM.
 The UTC offset is read dynamically from WordPress options (gmt_offset).
 """
+import html
 import logging
 from datetime import datetime, timedelta, timezone
 
@@ -26,6 +27,16 @@ WAITING_DATE = 0
 
 DATE_FORMAT_LOCAL = "%d/%m/%Y %H:%M"
 DATE_FORMAT_WP = "%Y-%m-%d %H:%M:%S"
+
+_MONTHS_ES = (
+    "", "enero", "febrero", "marzo", "abril", "mayo", "junio",
+    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+)
+
+
+def _friendly_date(dt: datetime) -> str:
+    """Return a human-readable Spanish date string, e.g. '1 de marzo de 2024 a las 10:30'."""
+    return f"{dt.day} de {_MONTHS_ES[dt.month]} de {dt.year} a las {dt.strftime('%H:%M')}"
 
 STRING_ENTER_DATE = (
     "📅 Introduce la nueva fecha y hora de publicación con el formato:\n"
@@ -123,19 +134,23 @@ async def handle_date_input(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     except Exception:
         post_url = None
 
-    friendly_date = local_dt.strftime("%-d de %B de %Y a las %H:%M").replace(
-        "January", "enero").replace("February", "febrero").replace("March", "marzo"
-        ).replace("April", "abril").replace("May", "mayo").replace("June", "junio"
-        ).replace("July", "julio").replace("August", "agosto").replace("September", "septiembre"
-        ).replace("October", "octubre").replace("November", "noviembre").replace("December", "diciembre")
+    friendly_date = _friendly_date(local_dt)
 
-    lines = [f"✅ <b>Fecha actualizada correctamente</b>"]
-    lines.append(f"🗓️ Nueva fecha: <b>{friendly_date}</b>")
-    lines.append(f"📌 <b>Post ID:</b> {post_id}")
+    lines = ["✅ <b>Fecha actualizada correctamente</b>"]
+    lines.append(f"🗓️ Nueva fecha: <b>{html.escape(friendly_date)}</b>")
+    lines.append(f"📌 <b>Post ID:</b> {html.escape(str(post_id))}")
     if post_url:
-        lines.append(f"🔗 <a href='{post_url}'>Ver entrada</a>")
+        lines.append(f"🔗 <a href='{html.escape(post_url)}'>Ver entrada</a>")
 
-    await status_msg.edit_text("\n".join(lines), parse_mode="HTML")
+    msg_text = "\n".join(lines)
+    try:
+        await status_msg.edit_text(msg_text, parse_mode="HTML")
+    except Exception as exc:
+        logger.warning("edit_text failed, falling back to reply_text: %s", exc)
+        try:
+            await update.message.reply_text(msg_text, parse_mode="HTML", disable_web_page_preview=True)
+        except Exception as exc2:
+            logger.error("reply_text fallback also failed: %s", exc2)
     return ConversationHandler.END
 
 
