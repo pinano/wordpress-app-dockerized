@@ -219,7 +219,7 @@ async def handle_content(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
         data["content"] = text
 
-    await update.message.reply_text("🗺️ Envía una Ubicación (GPS) o pulsa SALTAR", reply_markup=SKIP_KEYBOARD)
+    await update.message.reply_text("Envía una ubicación (GPS) o pulsa SALTAR", reply_markup=SKIP_KEYBOARD)
     return LOCATION_STATE
 
 async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
