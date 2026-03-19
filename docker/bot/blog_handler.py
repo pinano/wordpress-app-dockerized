@@ -282,7 +282,7 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         )
         return MEDIA
 
-    status_msg = await update.message.reply_text("⏳ Descargando y procesando, esto puede tardar unos segundos...", reply_markup=REMOVE_KEYBOARD)
+    status_msg = await update.message.reply_text("⏳ ¡¡ESPERA!! Descargando y procesando, esto puede tardar unos segundos...", reply_markup=REMOVE_KEYBOARD)
     data["status_msg_id"] = status_msg.message_id
 
     # ── Download ─────────────────────────────────────────────────────────────
@@ -620,7 +620,7 @@ async def borrar_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     context.user_data.pop("last_published", None)
 
     items_str = ", ".join(deleted_items)
-    await status_msg.edit_text(f"✅ <b>Deshecho con éxito.</b>\nSe ha eliminado: {items_str}.", parse_mode="HTML")
+    await status_msg.edit_text(f"✅ <b>Borrado con éxito.</b>\nSe ha eliminado: {items_str}.", parse_mode="HTML")
 
 # ── Build the ConversationHandler ─────────────────────────────────────────────
 
