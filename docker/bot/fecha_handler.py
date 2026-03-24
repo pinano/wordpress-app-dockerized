@@ -72,6 +72,10 @@ async def fecha_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         )
         return ConversationHandler.END
 
+    if context.args:
+        raw_text = " ".join(context.args)
+        return await _process_date_update(update, context, raw_text)
+
     await update.message.reply_text(STRING_ENTER_DATE, parse_mode="HTML")
     return WAITING_DATE
 
@@ -79,7 +83,11 @@ async def fecha_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 async def handle_date_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """State WAITING_DATE — parse and apply the new date."""
     raw_text = update.message.text.strip()
+    return await _process_date_update(update, context, raw_text)
 
+
+async def _process_date_update(update: Update, context: ContextTypes.DEFAULT_TYPE, raw_text: str) -> int:
+    """Parse raw text as date and apply updates to WordPress."""
     # Parse the date
     try:
         local_dt = datetime.strptime(raw_text, DATE_FORMAT_LOCAL)
@@ -170,6 +178,7 @@ async def handle_date_input(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         except Exception as exc2:
             logger.error("reply_text fallback also failed: %s", exc2)
     return ConversationHandler.END
+
 
 
 async def _cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
