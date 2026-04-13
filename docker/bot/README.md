@@ -57,11 +57,11 @@ Llegados aquí debes adjuntar el material principal de la entrada:
 
 Una vez recibido **uno** de estos medios, se limpiarán cachés, el post pasará a estado publicado (`publish`) y recibirás un resumen final enriquecido en Telegram listando URLs, IDs y tu carátula.
 
-### 3. `/fecha`
-Permite modificar la fecha de publicación del último post creado. El bot leerá automáticamente el desfase horario de tu WordPress (`gmt_offset`) para que la fecha coincida exactamente con lo que ves en el panel. Al cambiar la fecha del post, también se actualiza la fecha de todos sus medios asociados (fotos de la galería, etc.).
+### 3. `/fecha` | `/date`
+Permite modificar la fecha de publicación del último post creado. El bot leerá automáticamente el desfase horario de tu WordPress (`gmt_offset`) para que la fecha coincida exactamente con lo que ves en el panel.
 
-### 4. `/borrar` (El botón del Pánico)
-Si detectas alguna errata inaceptable o escogiste el vídeo equivocado un milisegundo después de terminar con el comando `/blog`, solo escribe `/borrar`.
+### 4. `/borrar` | `/delete` | `/undo` (El botón del Pánico)
+Si detectas alguna errata inaceptable o escogiste el vídeo equivocado un milisegundo después de terminar con el comando `/blog`, solo escribe `/borrar`, `/delete` o `/undo`.
 
 El bot tiene una memoria volátil inteligente (`user_data["last_published"]`) donde retiene la identidad matemática del **último** contenido que creó. Usando `/borrar`, purgará sin piedad:
 1. El archivo o archivos principales (El vídeo o la lista de fotos de la galería).

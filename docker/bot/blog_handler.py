@@ -647,19 +647,20 @@ async def ayuda_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     """Envía un mensaje de ayuda explicando las funcionalidades."""
     help_text = (
         "🤖 <b>Menú de Ayuda del Bot</b>\n\n"
-        "Comandos disponibles:\n"
-        "• /blog - Inicia el asistente paso a paso para publicar una nueva entrada.\n"
-        "• /fecha - Cambia la fecha de publicación de la última entrada publicada.\n"
-        "• /borrar - Elimina por completo (de WordPress y tu servidor) la última entrada que acabas de publicar, incluyendo sus fotos o vídeos.\n"
-        "• /ayuda - Muestra este mensaje.\n\n"
+        "Comandos disponibles (bilingües):\n"
+        "• /blog - Inicia el asistente para una nueva entrada.\n"
+        "• /blog gallery - Inicia el asistente en <b>Modo Galería</b> (varias fotos).\n"
+        "• /fecha | /date - Cambia la fecha de la última entrada.\n"
+        "• /borrar | /delete | /undo - Elimina la última entrada y sus medios.\n"
+        "• /ayuda | /help - Muestra este mensaje.\n"
+        "• /cancel | /cancelar - Cancela la operación actual.\n\n"
         "📝 <b>Cómo publicar:</b>\n"
-        "1. Escribe el <b>Título</b> (obligatorio)\n"
-        "2. Escribe el <b>Texto/Extracto</b> (o pulsa SALTAR)\n"
-        "3. Envía una <b>Ubicación (GPS)</b> (o pulsa SALTAR)\n"
-        "4. Envía un <b>Medio</b> (obligatorio): Puede ser una Foto, Vídeo, Nota de voz o Archivo.\n\n"
-        "🖼️ <b>Galerías:</b>\n"
-        "Usa <code>/blog gallery</code> para publicar varias fotos a la vez (máx. 15). Envía las fotos y pulsa el botón 'Finalizar' al terminar.\n\n"
-        "<i>Nota: Los vídeos pesados pueden tardar unos segundos en procesarse para generar su formato óptimo web y carátula.</i>"
+        "1. Escribe el <b>Título</b>\n"
+        "2. Escribe el <b>Texto</b> (o SALTAR)\n"
+        "3. Envía <b>Ubicación</b> (o SALTAR)\n"
+        "4. Envía <b>Medio</b>: Foto, Vídeo, Audio o Archivo.\n\n"
+        "🖼️ <b>Sobre las Galerías:</b>\n"
+        "En modo galería puedes enviar hasta 15 fotos y luego debes pulsar el botón para finalizar la publicación."
     )
     await update.message.reply_text(help_text, parse_mode="HTML")
 
@@ -754,7 +755,7 @@ def build_blog_conversation_handler() -> ConversationHandler:
             ],
         },
         fallbacks=[
-            CommandHandler("cancel", _cancel),
+            CommandHandler(["cancel", "cancelar"], _cancel),
         ],
         # Allow user to restart the command mid-conversation
         allow_reentry=True,

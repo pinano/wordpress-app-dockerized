@@ -39,9 +39,10 @@ def _friendly_date(dt: datetime) -> str:
     return f"{dt.day} de {_MONTHS_ES[dt.month]} de {dt.year} a las {dt.strftime('%H:%M')}"
 
 STRING_ENTER_DATE = (
-    "📅 Introduce la nueva fecha y hora de publicación con el formato:\n"
-    "<code>DD/MM/AAAA HH:MM</code>\n\n"
-    "Ejemplo: <code>01/01/2024 10:30</code>"
+    "📅 Introduce la nueva fecha de publicación:\n"
+    "• <code>DD/MM/AAAA HH:MM</code> (Ejem: 3/4/2026 10:30)\n"
+    "• <code>DD/MM/AAAA</code> (Ejem: 3/4/2026)\n\n"
+    "<i>Si omites la hora, se intentará mantener la hora original del post.</i>"
 )
 
 
@@ -88,17 +89,44 @@ async def handle_date_input(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
 async def _process_date_update(update: Update, context: ContextTypes.DEFAULT_TYPE, raw_text: str) -> int:
     """Parse raw text as date and apply updates to WordPress."""
-    # Parse the date
+    # Parse the date with multiple formats
+    local_dt = None
+    used_only_date = False
+    
+    # Try full format first
     try:
-        local_dt = datetime.strptime(raw_text, DATE_FORMAT_LOCAL)
+        local_dt = datetime.strptime(raw_text, "%d/%m/%Y %H:%M")
     except ValueError:
+        # Try only date
+        try:
+            local_dt = datetime.strptime(raw_text, "%d/%m/%Y")
+            used_only_date = True
+        except ValueError:
+            pass
+
+    if not local_dt:
         await update.message.reply_text(
             "⚠️ Formato incorrecto. Inténtalo de nuevo:\n"
-            "<code>DD/MM/AAAA HH:MM</code>\n\n"
-            "Ejemplo: <code>01/01/2024 10:30</code>",
+            "• <code>DD/MM/AAAA HH:MM</code>\n"
+            "• <code>DD/MM/AAAA</code>\n\n"
+            "Ejemplo: <code>3/4/2026</code>",
             parse_mode="HTML",
         )
         return WAITING_DATE
+
+    last_pub = context.user_data.get("last_published", {})
+    post_id = last_pub.get("post_id")
+
+    # If only date was provided, try to preserve original HH:MM
+    if used_only_date and post_id:
+        try:
+            # wp post get returns YYYY-MM-DD HH:MM:SS
+            current_raw = wp_cli.run("post", "get", post_id, "--field=post_date")
+            if current_raw:
+                current_dt = datetime.strptime(current_raw.strip(), DATE_FORMAT_WP)
+                local_dt = local_dt.replace(hour=current_dt.hour, minute=current_dt.minute, second=current_dt.second)
+        except Exception as exc:
+            logger.warning("Could not preserve original time for post %s, using 00:00: %s", post_id, exc)
 
     # Get WP timezone offset to compute GMT date
     gmt_offset_hours = _get_wp_gmt_offset()
@@ -196,14 +224,14 @@ async def _cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 def build_fecha_conversation_handler() -> ConversationHandler:
     return ConversationHandler(
-        entry_points=[CommandHandler("fecha", fecha_start)],
+        entry_points=[CommandHandler(["fecha", "date"], fecha_start)],
         states={
             WAITING_DATE: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_date_input),
             ],
         },
         fallbacks=[
-            CommandHandler("cancel", _cancel),
+            CommandHandler(["cancel", "cancelar"], _cancel),
         ],
         allow_reentry=True,
         per_message=False,

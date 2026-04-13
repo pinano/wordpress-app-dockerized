@@ -80,9 +80,10 @@ GALLERY MODE: TITLE → CONTENT (optional, SKIP) → LOCATION_STATE → MEDIA (m
 ### Bot Commands
 - `/blog` — Interactive publisher (4-step flow). Instant publish for single media.
 - `/blog gallery` — Special mode for galleries (up to 15 photos). Requires manual finish button.
-- `/fecha` — Updates the publication date of the last post and all its associated media.
-- `/borrar` (undo) — Deletes the last published post (post + media(s) + thumbnail). Auto-consumes.
-- `/ayuda` (help) — Help. `/start` — Welcome.
+- `/fecha` | `/date` — Updates the publication date of the last post and all its associated media.
+- `/borrar` | `/delete` | `/undo` — Deletes the last published post (post + media(s) + thumbnail). Auto-consumes.
+- `/ayuda` | `/help` — Help. `/start` — Welcome.
+- `/cancel` | `/cancelar` — Cancel current conversation.
 
 ### Bot Security
 - `BOT_ALLOWED_USERS` in `.env`: Comma-separated Telegram IDs. Only these users can use the bot.

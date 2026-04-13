@@ -41,12 +41,12 @@ def main() -> None:
         .build()
     )
 
-    # /start & /ayuda
+    # /start & /ayuda / /help
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("ayuda", ayuda_command))
+    app.add_handler(CommandHandler(["ayuda", "help"], ayuda_command))
 
-    # /borrar
-    app.add_handler(CommandHandler("borrar", borrar_command))
+    # /borrar / /delete / /undo
+    app.add_handler(CommandHandler(["borrar", "delete", "undo"], borrar_command))
 
     # /fecha conversation
     app.add_handler(build_fecha_conversation_handler())
