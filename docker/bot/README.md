@@ -41,6 +41,9 @@ Te pedirá el contenido de la entrada. Puedes escribir un párrafo, varios o pre
 **Paso 3: La Ubicación (Opcional)**
 Te pedirá enviar una chincheta GPS de tu móvil. Si lo haces, fabricará automáticamente un Enlace Inteligente a Google Maps anidado en tu Texto. Si no la necesitas, pulsa «**SALTAR**».
 
+**Paso Especial: Modo Galería**
+Si iniciaste el comando como `/blog gallery`, el bot entrará en modo acumulación. En lugar de publicar al recibir el primer medio, te permitirá enviar hasta **15 fotos** (una a una o en álbum) y solo publicará cuando pulses el botón **"✅ FINALIZAR Y PUBLICAR"**. Se asignará el formato `post-format-gallery` a la entrada.
+
 **Paso 4: El Archivo Adjunto Multimedia (Obligatorio)**
 Llegados aquí debes adjuntar el material principal de la entrada:
 
@@ -54,11 +57,14 @@ Llegados aquí debes adjuntar el material principal de la entrada:
 
 Una vez recibido **uno** de estos medios, se limpiarán cachés, el post pasará a estado publicado (`publish`) y recibirás un resumen final enriquecido en Telegram listando URLs, IDs y tu carátula.
 
-### 3. `/deshacer` (El botón del Pánico)
-Si detectas alguna errata inaceptable o escogiste el vídeo equivocado un milisegundo después de terminar con el comando `/blog`, solo escribe `/deshacer`.
+### 3. `/fecha`
+Permite modificar la fecha de publicación del último post creado. El bot leerá automáticamente el desfase horario de tu WordPress (`gmt_offset`) para que la fecha coincida exactamente con lo que ves en el panel. Al cambiar la fecha del post, también se actualiza la fecha de todos sus medios asociados (fotos de la galería, etc.).
 
-El bot tiene una memoria volátil inteligente (`user_data["last_published"]`) donde retiene la identidad matemática del **último** contenido que creó. Usando `/deshacer`, purgará sin piedad:
-1. El archivo principal de la Galería WP (El vídeo o foto que mandaste).
+### 4. `/borrar` (El botón del Pánico)
+Si detectas alguna errata inaceptable o escogiste el vídeo equivocado un milisegundo después de terminar con el comando `/blog`, solo escribe `/borrar`.
+
+El bot tiene una memoria volátil inteligente (`user_data["last_published"]`) donde retiene la identidad matemática del **último** contenido que creó. Usando `/borrar`, purgará sin piedad:
+1. El archivo o archivos principales (El vídeo o la lista de fotos de la galería).
 2. El archivo de Carátula (La miniatura del vídeo).
 3. El borrador entero en forma de Entrada de WordPress.
 

@@ -60,13 +60,15 @@ The bot is the heart of the project. It allows posting entries to WP from a mobi
 
 ### `/blog` Flow (ConversationHandler in `blog_handler.py`)
 ```
-TITLE → CONTENT (optional, SKIP) → LOCATION_STATE (optional GPS, SKIP) → MEDIA (mandatory) → DONE
+NORMAL MODE:  TITLE → CONTENT (optional, SKIP) → LOCATION_STATE → MEDIA (mandatory, single) → DONE
+GALLERY MODE: TITLE → CONTENT (optional, SKIP) → LOCATION_STATE → MEDIA (mandatory, multiple) → DONE
 ```
 
 ### Processed Media Types
 | Type | Processing | Result in WP |
 |---|---|---|
 | Photo | Direct | Featured image + `post-format-image` |
+| Gallery | Multiple Photos | `[gallery]` shortcode + `post-format-gallery` |
 | Video (MP4/MOV) | FFmpeg: thumbnail + transcode if MOV | `[video]` shortcode + `post-format-video` |
 | Audio / Voice | FFmpeg: convert to MP3 VBR | `<audio>` tag in content + `post-format-audio` |
 | Document | Direct | Generic attachment, fixed thumbnail (media ID 307) |
@@ -76,8 +78,10 @@ TITLE → CONTENT (optional, SKIP) → LOCATION_STATE (optional GPS, SKIP) → M
 - `307` → Generic document thumbnail
 
 ### Bot Commands
-- `/blog` — Interactive publisher (4-step flow)
-- `/deshacer` (undo) — Deletes the last published post (post + media + thumbnail). Auto-consumes: does not allow double deletion.
+- `/blog` — Interactive publisher (4-step flow). Instant publish for single media.
+- `/blog gallery` — Special mode for galleries (up to 15 photos). Requires manual finish button.
+- `/fecha` — Updates the publication date of the last post and all its associated media.
+- `/borrar` (undo) — Deletes the last published post (post + media(s) + thumbnail). Auto-consumes.
 - `/ayuda` (help) — Help. `/start` — Welcome.
 
 ### Bot Security
@@ -142,4 +146,4 @@ TITLE → CONTENT (optional, SKIP) → LOCATION_STATE (optional GPS, SKIP) → M
 
 ---
 
-*Last Updated: 2026-03-15*
+*Last Updated: 2026-04-13*

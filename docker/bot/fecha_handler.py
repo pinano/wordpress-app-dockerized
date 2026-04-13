@@ -132,8 +132,16 @@ async def _process_date_update(update: Update, context: ContextTypes.DEFAULT_TYP
 
     # Update dates on associated media attachments (non-fatal)
     media_ids_to_update: list[str] = []
-    if last_pub.get("media_id") and str(last_pub["media_id"]).isdigit():
-        media_ids_to_update.append(str(last_pub["media_id"]))
+    
+    # Support for both single media (old/legacy) and gallery lists
+    m_ids = last_pub.get("media_ids", [])
+    if last_pub.get("media_id"):
+        m_ids.append(last_pub["media_id"])
+    
+    for mid in set(m_ids):
+        if mid and str(mid).isdigit():
+            media_ids_to_update.append(str(mid))
+
     if last_pub.get("thumbnail_id") and str(last_pub["thumbnail_id"]).isdigit():
         media_ids_to_update.append(str(last_pub["thumbnail_id"]))
 

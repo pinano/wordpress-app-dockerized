@@ -42,13 +42,22 @@ logger = logging.getLogger(__name__)
 TITLE, CONTENT, MEDIA, DONE = range(4)
 TITLE, CONTENT, LOCATION_STATE, MEDIA = range(4)
 
+MAX_GALLERY_PHOTOS = 15
 STRING_SKIP = "SALTAR"
+STRING_FINISH_GALLERY = "✅ FINALIZAR Y PUBLICAR"
 STRING_ENTER_TITLE = "Título de la entrada"
 STRING_ENTER_EXCERPT = "Texto de la entrada (o pulsa SALTAR)"
 STRING_UPLOAD_MEDIA = "Envía imagen, vídeo o audio (obligatorio)"
+STRING_UPLOAD_GALLERY = "Envía fotos para la galería (máx. 15) y pulsa FINALIZAR"
 
 SKIP_KEYBOARD = ReplyKeyboardMarkup(
     [[KeyboardButton(STRING_SKIP)]],
+    resize_keyboard=True,
+    one_time_keyboard=True,
+    selective=True,
+)
+GALLERY_KEYBOARD = ReplyKeyboardMarkup(
+    [[KeyboardButton(STRING_FINISH_GALLERY)]],
     resize_keyboard=True,
     one_time_keyboard=True,
     selective=True,
@@ -152,6 +161,18 @@ async def blog_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         return ConversationHandler.END
 
     _clear_data(context)
+    data = _get_data(context)
+    
+    # Check for 'gallery' argument
+    is_gallery = False
+    if context.args and context.args[0].lower() == "gallery":
+        is_gallery = True
+        logger.info("User %s started a gallery post", user_id)
+        await update.message.reply_text("🖼️ <b>Modo Galería activado</b> (máximo 15 fotos).", parse_mode="HTML")
+    
+    data["is_gallery"] = is_gallery
+    data["gallery_ids"] = []
+
     await update.message.reply_text(STRING_ENTER_TITLE, reply_markup=REMOVE_KEYBOARD)
     return TITLE
 
@@ -259,7 +280,11 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await update.message.reply_text("⚠️ Por favor, envía una Ubicación o pulsa SALTAR.", reply_markup=SKIP_KEYBOARD)
         return LOCATION_STATE
 
-    await update.message.reply_text(STRING_UPLOAD_MEDIA, reply_markup=REMOVE_KEYBOARD)
+    if data.get("is_gallery"):
+        await update.message.reply_text(STRING_UPLOAD_GALLERY, reply_markup=GALLERY_KEYBOARD)
+    else:
+        await update.message.reply_text(STRING_UPLOAD_MEDIA, reply_markup=REMOVE_KEYBOARD)
+    
     return MEDIA
 
 
@@ -274,15 +299,43 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     text = msg.text.strip() if msg.text else ""
     msg_type = _media_type(msg)
 
+    # ── CASE: FINISH GALLERY ────────────────────────────────────────────────
+    if data.get("is_gallery") and text == STRING_FINISH_GALLERY:
+        if not data.get("gallery_ids"):
+            await update.message.reply_text("⚠️ No has enviado ninguna foto todavía. Envía al menos una.")
+            return MEDIA
+        return await _finish(update, context)
+
     # ── VERIFICAR MEDIO OBLIGATORIO ─────────────────────────────────────────
     if not msg_type:
-        await update.message.reply_text(
-            "⚠️ Se requiere adjuntar un archivo. " + STRING_UPLOAD_MEDIA,
-            reply_markup=REMOVE_KEYBOARD,
-        )
+        prompt = STRING_UPLOAD_GALLERY if data.get("is_gallery") else STRING_UPLOAD_MEDIA
+        await update.message.reply_text(f"⚠️ Se requiere adjuntar un archivo. {prompt}")
         return MEDIA
 
-    status_msg = await update.message.reply_text("⏳ ¡¡ESPERA!! Descargando y procesando, esto puede tardar unos segundos...", reply_markup=REMOVE_KEYBOARD)
+    # ── GALLERY MODE RESTRICTIONS ───────────────────────────────────────────
+    if data.get("is_gallery") and msg_type != "photo":
+        await update.message.reply_text("⚠️ En modo galería solo se pueden subir fotos.")
+        return MEDIA
+
+    if data.get("is_gallery") and len(data.get("gallery_ids", [])) >= MAX_GALLERY_PHOTOS:
+        await update.message.reply_text(f"⚠️ Has alcanzado el límite de {MAX_GALLERY_PHOTOS} fotos. Pulsa el botón para finalizar.")
+        return MEDIA
+
+    status_text = "⏳ Procesando medio..." if not data.get("is_gallery") else f"⏳ Procesando foto {len(data['gallery_ids']) + 1}..."
+    
+    if data.get("status_msg_id"):
+        try:
+            status_msg = await context.bot.edit_message_text(
+                chat_id=update.effective_chat.id,
+                message_id=data["status_msg_id"],
+                text=status_text
+            )
+        except Exception:
+            # Si el mensaje fue borrado o no se puede editar, enviamos uno nuevo
+            status_msg = await update.message.reply_text(status_text, reply_markup=REMOVE_KEYBOARD)
+    else:
+        status_msg = await update.message.reply_text(status_text, reply_markup=REMOVE_KEYBOARD)
+        
     data["status_msg_id"] = status_msg.message_id
 
     # ── Download ─────────────────────────────────────────────────────────────
@@ -310,24 +363,36 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     # ── PHOTO ─────────────────────────────────────────────────────────────────
     if effective_type == "photo":
         try:
-            media_id = wp_cli.run(
+            # Only set as featured image if it is the first photo
+            is_first = not data.get("gallery_ids")
+            import_args = [
                 "media", "import", local_full_path,
                 f"--post_id={post_id}",
-                "--featured_image",
                 f"--title={title}",
                 f"--caption={title}",
                 f"--alt={title}",
                 f"--user={wp_user}",
                 "--preserve-filetime",
                 "--porcelain",
-            )
+            ]
+            if is_first:
+                import_args.append("--featured_image")
+            
+            media_id = wp_cli.run(*import_args)
+            
             if media_id and media_id.isdigit():
-                wp_cli.run("post", "meta", "set", post_id, "_thumbnail_id", media_id)
-            wp_cli.run("post", "term", "set", post_id, "post_format", "post-format-image", "--by=slug")
+                if is_first:
+                    wp_cli.run("post", "meta", "set", post_id, "_thumbnail_id", media_id)
+                    data["media_id"] = media_id # Primary media ID for summary
+                    data["thumb_local_path"] = local_full_path
+                
+                if data.get("is_gallery"):
+                    data["gallery_ids"].append(media_id)
 
-            data["post_type"] = "image"
-            data["media_id"] = media_id
-            data["thumb_local_path"] = local_full_path
+            fmt = "post-format-gallery" if data.get("is_gallery") else "post-format-image"
+            wp_cli.run("post", "term", "set", post_id, "post_format", fmt, "--by=slug")
+            data["post_type"] = "image" if not data.get("is_gallery") else "gallery"
+            
         except Exception as exc:
             logger.exception("Photo import failed: %s", exc)
             data["post_type"] = "Error importing photo."
@@ -461,6 +526,21 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     data["file"] = file_relative_path
     data["post_category"] = category
 
+    if data.get("is_gallery"):
+        # Clean up the temporary status message
+        if "status_msg_id" in data:
+            try:
+                await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=data["status_msg_id"])
+            except Exception:
+                pass
+        
+        count = len(data["gallery_ids"])
+        await update.message.reply_text(
+            f"✅ Foto {count} añadida con éxito. Envía más o pulsa el botón para finalizar.",
+            reply_markup=GALLERY_KEYBOARD
+        )
+        return MEDIA
+
     return await _finish(update, context)
 
 
@@ -468,6 +548,15 @@ async def _finish(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Clean cache, build summary message, end conversation."""
     data = _get_data(context)
     post_id = data.get("post_id", "")
+
+    # Handle Gallery Shortcode
+    if data.get("is_gallery") and data.get("gallery_ids"):
+        ids_str = ",".join(data["gallery_ids"])
+        shortcode = f'[gallery ids="{ids_str}"]'
+        try:
+            wp_cli.run("post", "update", post_id, f"--post_content={shortcode}")
+        except Exception as exc:
+            logger.exception("Failed to add gallery shortcode to post %s: %s", post_id, exc)
 
     # Clean WP Rocket cache
     try:
@@ -500,7 +589,10 @@ async def _finish(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         lines.append(f"📂 <b>Categoría:</b> {data['post_category']}")
     if data.get("post_type"):
         lines.append(f"📎 <b>Medio:</b> {data['post_type']}")
-    if data.get("media_id"):
+    
+    if data.get("is_gallery") and data.get("gallery_ids"):
+        lines.append(f"🆔 <b>Media IDs:</b> {', '.join(data['gallery_ids'])}")
+    elif data.get("media_id"):
         lines.append(f"🆔 <b>Media ID:</b> {data['media_id']}")
 
     msg_text = "\n".join(lines)
@@ -537,10 +629,11 @@ async def _finish(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             reply_markup=REMOVE_KEYBOARD
         )
 
-    # Guardar en last_published para el comando /deshacer
+    # Guardar en last_published para el comando /borrar
+    # media_ids es ahora una LISTA para soportar galerías
     context.user_data["last_published"] = {
         "post_id": post_id,
-        "media_id": data.get("media_id", "").split()[0] if data.get("media_id") else None, # Puede traer texto extra en videos
+        "media_ids": data.get("gallery_ids") if data.get("is_gallery") else [data.get("media_id", "").split()[0]],
         "thumbnail_id": data.get("raw_thumbnail_id")
     }
 
@@ -564,6 +657,8 @@ async def ayuda_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         "2. Escribe el <b>Texto/Extracto</b> (o pulsa SALTAR)\n"
         "3. Envía una <b>Ubicación (GPS)</b> (o pulsa SALTAR)\n"
         "4. Envía un <b>Medio</b> (obligatorio): Puede ser una Foto, Vídeo, Nota de voz o Archivo.\n\n"
+        "🖼️ <b>Galerías:</b>\n"
+        "Usa <code>/blog gallery</code> para publicar varias fotos a la vez (máx. 15). Envía las fotos y pulsa el botón 'Finalizar' al terminar.\n\n"
         "<i>Nota: Los vídeos pesados pueden tardar unos segundos en procesarse para generar su formato óptimo web y carátula.</i>"
     )
     await update.message.reply_text(help_text, parse_mode="HTML")
@@ -593,13 +688,21 @@ async def borrar_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         except Exception as exc:
             logger.warning("Fallo al borrar thumbnail_id %s: %s", last_pub["thumbnail_id"], exc)
 
-    # Borrar medio adjunto (foto, vídeo, audio)
-    if last_pub.get("media_id") and last_pub["media_id"].isdigit():
-        try:
-            wp_cli.run("post", "delete", last_pub["media_id"], "--force")
-            deleted_items.append("medio")
-        except Exception as exc:
-            logger.warning("Fallo al borrar media_id %s: %s", last_pub["media_id"], exc)
+    # Borrar medios adjuntos (pueden ser uno o varios en caso de galería)
+    media_ids = last_pub.get("media_ids", [])
+    if last_pub.get("media_id"): # Compatibilidad con formato antiguo en user_data si existiera
+        media_ids.append(last_pub["media_id"])
+    
+    # Usar set para evitar duplicados si media_id y media_ids tienen lo mismo
+    for mid in set(m for m in media_ids if m):
+        mid = mid.split()[0] # Limpiar texto extra si lo hay (como en vídeos)
+        if mid and mid.isdigit():
+            try:
+                wp_cli.run("post", "delete", mid, "--force")
+                if "medios" not in deleted_items:
+                    deleted_items.append("medios")
+            except Exception as exc:
+                logger.warning("Fallo al borrar media_id %s: %s", mid, exc)
 
     # Borrar el post principal
     try:

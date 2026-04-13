@@ -129,7 +129,9 @@ You can enable additional stack features for specific WordPress applications via
 ## Services
 
 - **app**: PHP-FPM + Apache (serversideup/php image).
+- **bot** (Optional): Telegram bot for remote blogging (Python + FFmpeg).
 - **cron**: CLI container to run scheduled tasks.
 - **db**: MariaDB 12.1.2.
 - **redis** (Optional): In-memory cache store (Powered by Valkey).
+- **sftp** (Optional): SFTP server for file access.
 - **wpcli** (On-demand): WordPress CLI tools. Run via `docker compose run --rm wpcli ...`.
