@@ -132,7 +132,9 @@ def _media_type(msg) -> str | None:
     return None
 
 
-def _category_for_type(msg_type: str) -> str:
+def _category_for_type(msg_type: str, is_gallery: bool = False) -> str:
+    if is_gallery:
+        return "fotos,galerias"
     mapping = {
         "audio": "audios",
         "document": "documentos",
@@ -351,7 +353,7 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     if "animations" in file_relative_path:
         effective_type = "animation"
 
-    category = _category_for_type(effective_type)
+    category = _category_for_type(effective_type, data.get("is_gallery", False))
     file_stem = Path(local_full_path).stem          # e.g. "file_123"
     file_ext = Path(local_full_path).suffix.lower() # e.g. ".mp4"
 
@@ -653,7 +655,7 @@ async def ayuda_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         "• /fecha | /date - Cambia la fecha de la última entrada.\n"
         "• /borrar | /delete | /undo - Elimina la última entrada y sus medios.\n"
         "• /ayuda | /help - Muestra este mensaje.\n"
-        "• /cancel | /cancelar - Cancela la operación actual.\n\n"
+        "• /cancelar | /cancel - Cancela la operación actual.\n\n"
         "📝 <b>Cómo publicar:</b>\n"
         "1. Escribe el <b>Título</b>\n"
         "2. Escribe el <b>Texto</b> (o SALTAR)\n"
