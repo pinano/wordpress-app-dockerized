@@ -256,6 +256,7 @@ services:
       SUDO_ACCESS: "false"
     volumes:
       - ./docroot:/config/upload
+      - ./docker/scripts/init-sftp.sh:/custom-cont-init.d/init-sftp.sh:ro
     networks:
       - backnet
 
