@@ -20,7 +20,7 @@ Custom dockerized personal blog. WordPress serving content, with a Telegram bot 
 | **Reverse Proxy** | External Traefik (`traefik` network), configured via labels in `docker-compose.yml` |
 | **Cache** | Valkey 9 (Redis-compatible), `redis` profile, "Redis Object Cache" plugin in WP |
 | **Cron** | Separate PHP-CLI container, `cron` profile, reads `docker/scripts/crontab` |
-| **SFTP** | `atmoz/sftp:alpine`, `sftp` profile, port `22{PROJECT_ID}` |
+| **SFTP** | `linuxserver/openssh-server`, `sftp` profile, port `22{PROJECT_ID}` |
 | **Security** | CrowdSec + Traefik Bouncer. Watchdog script with Telegram alerts. |
 
 Optional services (`bot`, `cron`, `db`, `sftp`, `redis`) use **Docker Compose profiles**. They don't start automatically.
