@@ -255,7 +255,7 @@ services:
       PASSWORD_ACCESS: "true"
       SUDO_ACCESS: "false"
     volumes:
-      - ./docroot:/home/${SFTP_USER}/upload
+      - ./docroot:/config/upload
     networks:
       - backnet
 
