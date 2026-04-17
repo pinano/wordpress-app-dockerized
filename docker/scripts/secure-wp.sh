@@ -35,16 +35,16 @@ fix_permissions() {
     # Only try chown if we are root or if ownership is completely wrong
     # Silencing errors to avoid terminal flood in macOS/Docker environments
     if [ "$(id -u)" = "0" ] && [ -n "$IDS" ]; then
-        chown -R "$IDS" docroot 2>/dev/null
+        chown -R "$IDS" "$DOCROOT" 2>/dev/null
     fi
     
-    # Use -f to silence errors during chmod
-    find docroot -type d -exec chmod 755 {} +
-    find docroot -type f -exec chmod 644 {} +
+    # Use -f to silence errors during chmod (useful for tmpfs mounts)
+    find "$DOCROOT" -type d -exec chmod -f 755 {} +
+    find "$DOCROOT" -type f -exec chmod -f 644 {} +
     
     # Secure wp-config.php specifically
     if [ -f "$DOCROOT/wp-config.php" ]; then
-        chmod 640 "$DOCROOT/wp-config.php"
+        chmod -f 640 "$DOCROOT/wp-config.php"
     fi
 }
 
@@ -56,17 +56,17 @@ lock_site() {
     
     # 2. Make EVERYTHING Read-Only first
     echo "  -> Setting all files to 444..."
-    find "$DOCROOT" -type f -exec chmod 444 {} +
+    find "$DOCROOT" -type f -exec chmod -f 444 {} +
     
     # 3. Restore write access to specific directories
     for dir in "${WRITEABLE_DIRS[@]}"; do
         if [ -d "$dir" ]; then
             echo "  -> Allowing write to directory: $dir"
             # Directory needs 755 (rwx)
-            chmod 755 "$dir"
+            chmod -f 755 "$dir"
             # Contents need 644 (rw-) for files and 755 for subdirs
-            find "$dir" -type d -exec chmod 755 {} +
-            find "$dir" -type f -exec chmod 644 {} +
+            find "$dir" -type d -exec chmod -f 755 {} +
+            find "$dir" -type f -exec chmod -f 644 {} +
         fi
     done
     
@@ -74,13 +74,13 @@ lock_site() {
     for file in "${WRITEABLE_FILES[@]}"; do
         if [ -f "$file" ]; then
             echo "  -> Allowing write to file: $file"
-            chmod 644 "$file"
+            chmod -f 644 "$file"
         fi
     done
 
     # 5. Extra security for wp-config.php
     if [ -f "$DOCROOT/wp-config.php" ]; then
-        chmod 440 "$DOCROOT/wp-config.php"
+        chmod -f 440 "$DOCROOT/wp-config.php"
     fi
 }
 
