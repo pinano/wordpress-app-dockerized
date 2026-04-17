@@ -45,6 +45,17 @@ make open-ports / close-ports      # Open/close DB+SFTP to the outside (0.0.0.0 
 make size-small/medium/large       # Apply resource profiles to .env
 ```
 
+### 🛡️ WordPress Hardening & Permissions
+To prevent unauthorized file modifications (e.g., from vulnerable plugins), the site core can be locked:
+
+- `make secure` — **Lock the site**. Core files become Read-Only. Uploads/cache remain writable.
+- `make insecure` — **Unlock the site**. Enable write access for updates or maintenance.
+- `make fix-permissions` — Restore standard owner/base permissions (644/755).
+
+*Always keep the site in `secure` mode unless you are actively updating it.*
+
+---
+
 If you need to add new functionality, **add it to the `Makefile` first**.
 
 ---
@@ -147,4 +158,4 @@ GALLERY MODE: TITLE → CONTENT (optional, SKIP) → LOCATION_STATE → MEDIA (m
 
 ---
 
-*Last Updated: 2026-04-13*
+*Last Updated: 2026-04-17*

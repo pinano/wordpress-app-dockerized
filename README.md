@@ -125,6 +125,9 @@ You can enable additional stack features for specific WordPress applications via
 | `make size-medium` | Apply Medium sizing profile |
 | `make size-large` | Apply Large sizing profile |
 | `make size-show` | Show current sizing config |
+| `make secure` | Lock site core (Set files to 444/Read-Only) |
+| `make insecure` | Unlock site core (Set files to 644/Write access) |
+| `make fix-permissions` | Fix ownership and base permissions (644/755) |
 
 ## Services
 
@@ -135,3 +138,13 @@ You can enable additional stack features for specific WordPress applications via
 - **redis** (Optional): In-memory cache store (Powered by Valkey).
 - **sftp** (Optional): SFTP server for file access.
 - **wpcli** (On-demand): WordPress CLI tools. Run via `docker compose run --rm wpcli ...`.
+
+## Security & Permissions (Hardening)
+
+To prevent core file hijacking (e.g., unauthorized modifications to `index.php`), this stack features a built-in hardening system:
+
+- **Locked (Default/Safe)**: Use `make secure` to make all WordPress core files Read-Only for the web server. This prevents many common exploits from modifying your site. Key folders like `uploads`, `cache`, and `languages` remain writable for standard operation.
+- **Unlocked (Maintenance)**: Use `make insecure` when you need to update WordPress or install/update plugins from the admin dashboard.
+- **Repair**: If you ever experience weird permission issues after manual file uploads, use `make fix-permissions` to restore the standard UID/GID and permission levels.
+
+*It is highly recommended to keep the site in **secure** mode during normal operation.*

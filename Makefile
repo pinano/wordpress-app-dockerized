@@ -41,13 +41,18 @@ help:
 	fi
 	@echo ""
 	@echo "Cron Management:"
-	@echo "  crontab-init Create example crontab file"
+	@echo "  crontab-init  Create example crontab file"
 	@echo ""
 	@echo "Sizing:"
 	@echo "  size-small    Configure .env for low-traffic app (< 500 visits/day)"
 	@echo "  size-medium   Configure .env for medium-traffic app (500-5000 visits/day)"
 	@echo "  size-large    Configure .env for high-traffic app (> 5000 visits/day)"
 	@echo "  size-show     Show current sizing configuration"
+	@echo ""
+	@echo "Security Management:"
+	@echo "  secure          Lock WordPress core files (Read-Only)"
+	@echo "  insecure        Unlock WordPress core files (Write access for maintenance)"
+	@echo "  fix-permissions Fix ownership and base permissions"
 
 .PHONY: init
 init:
@@ -289,6 +294,25 @@ redis-monitor:
 .PHONY: redis-ping
 redis-ping:
 	@. ./docker/scripts/set-env-vars.sh && docker compose exec redis valkey-cli ping
+
+# --- Security Management ---
+.PHONY: secure
+secure: _ensure_env
+	@USER_ID=$$(grep '^USER_ID=' .env | cut -d= -f2 | head -1); \
+	GROUP_ID=$$(grep '^GROUP_ID=' .env | cut -d= -f2 | head -1); \
+	./docker/scripts/secure-wp.sh lock "$$USER_ID:$$GROUP_ID"
+
+.PHONY: insecure
+insecure: _ensure_env
+	@USER_ID=$$(grep '^USER_ID=' .env | cut -d= -f2 | head -1); \
+	GROUP_ID=$$(grep '^GROUP_ID=' .env | cut -d= -f2 | head -1); \
+	./docker/scripts/secure-wp.sh unlock "$$USER_ID:$$GROUP_ID"
+
+.PHONY: fix-permissions
+fix-permissions: _ensure_env
+	@USER_ID=$$(grep '^USER_ID=' .env | cut -d= -f2 | head -1); \
+	GROUP_ID=$$(grep '^GROUP_ID=' .env | cut -d= -f2 | head -1); \
+	./docker/scripts/secure-wp.sh fix "$$USER_ID:$$GROUP_ID"
 
 # --- Sizing Profiles ---
 # Helper function to update a variable in .env (works on both macOS and Linux)
