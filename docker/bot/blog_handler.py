@@ -377,10 +377,9 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
                 "--preserve-filetime",
                 "--porcelain",
             ]
-            if is_first:
-                import_args.append("--featured_image")
             
-            media_id = wp_cli.run(*import_args)
+            media_id_raw = wp_cli.run(*import_args)
+            media_id = media_id_raw.split()[0] if media_id_raw else ""
             
             if media_id and media_id.isdigit():
                 if is_first:
@@ -407,9 +406,8 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
             media_processor.extract_thumbnail(local_full_path, thumb_path)
 
             # 2. Import thumbnail as featured image
-            thumbnail_id = wp_cli.run(
+            thumbnail_id_raw = wp_cli.run(
                 "media", "import", thumb_path,
-                "--featured_image",
                 f"--title={title}",
                 f"--caption={title}",
                 f"--alt={title}",
@@ -418,6 +416,7 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
                 "--preserve-filetime",
                 "--porcelain",
             )
+            thumbnail_id = thumbnail_id_raw.split()[0] if thumbnail_id_raw else ""
             # Guardamos el thumbnail_id crudo para /deshacer
             if thumbnail_id and thumbnail_id.isdigit():
                 data["raw_thumbnail_id"] = thumbnail_id
@@ -431,7 +430,7 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
                 file_relative_path = str(Path(file_relative_path).with_suffix(".mp4"))
 
             # 4. Import the video
-            media_id = wp_cli.run(
+            media_id_raw = wp_cli.run(
                 "media", "import", local_full_path,
                 f"--title={title}",
                 f"--caption={title}",
@@ -441,6 +440,7 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
                 "--preserve-filetime",
                 "--porcelain",
             )
+            media_id = media_id_raw.split()[0] if media_id_raw else ""
 
             # Assign the thumbnail to the video attachment so it shows up in the Media Grid
             if thumbnail_id and thumbnail_id.isdigit():
@@ -485,7 +485,7 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
             # Generic audio thumbnail (WP media ID 306 — must exist in WP)
             wp_cli.run("post", "meta", "set", post_id, "_thumbnail_id", "306")
 
-            media_id = wp_cli.run(
+            media_id_raw = wp_cli.run(
                 "media", "import", mp3_path,
                 f"--title={title}",
                 f"--caption={title}",
@@ -493,6 +493,7 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
                 f"--post_id={post_id}",
                 "--porcelain",
             )
+            media_id = media_id_raw.split()[0] if media_id_raw else ""
             media_url = wp_cli.run("post", "get", media_id, "--field=guid")
             stripped = media_url.split(":", 1)[1] if media_url and ":" in media_url else media_url or ""
             audio_tag = f'<audio controls><source src="{stripped}" type="audio/mpeg"></audio>'
@@ -511,7 +512,7 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
             # Generic document thumbnail (WP media ID 307 — must exist in WP)
             wp_cli.run("post", "meta", "set", post_id, "_thumbnail_id", "307")
 
-            media_id = wp_cli.run(
+            media_id_raw = wp_cli.run(
                 "media", "import", local_full_path,
                 f"--title={title}",
                 f"--caption={title}",
@@ -519,6 +520,7 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
                 f"--post_id={post_id}",
                 "--porcelain",
             )
+            media_id = media_id_raw.split()[0] if media_id_raw else ""
             data["post_type"] = "document"
             data["media_id"] = media_id
         except Exception as exc:
