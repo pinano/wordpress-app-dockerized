@@ -15,6 +15,7 @@ State machine:
 """
 import logging
 import os
+import re
 from pathlib import Path
 
 from telegram import (
@@ -77,6 +78,14 @@ def _wp_user(telegram_id: int) -> int:
 
 def _allowed(telegram_id: int) -> bool:
     return telegram_id in config.ALLOWED_USERS
+
+
+def _extract_id(raw_output: str) -> str:
+    """Safely extract the first sequence of digits from wp-cli output."""
+    if not raw_output:
+        return ""
+    match = re.search(r'\b\d+\b', raw_output)
+    return match.group(0) if match else ""
 
 
 def _get_data(context: ContextTypes.DEFAULT_TYPE) -> dict:
@@ -379,7 +388,7 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
             ]
             
             media_id_raw = wp_cli.run(*import_args)
-            media_id = media_id_raw.split()[0] if media_id_raw else ""
+            media_id = _extract_id(media_id_raw)
             
             if media_id and media_id.isdigit():
                 if is_first:
@@ -416,7 +425,7 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
                 "--preserve-filetime",
                 "--porcelain",
             )
-            thumbnail_id = thumbnail_id_raw.split()[0] if thumbnail_id_raw else ""
+            thumbnail_id = _extract_id(thumbnail_id_raw)
             # Guardamos el thumbnail_id crudo para /deshacer
             if thumbnail_id and thumbnail_id.isdigit():
                 data["raw_thumbnail_id"] = thumbnail_id
@@ -440,7 +449,7 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
                 "--preserve-filetime",
                 "--porcelain",
             )
-            media_id = media_id_raw.split()[0] if media_id_raw else ""
+            media_id = _extract_id(media_id_raw)
 
             # Assign the thumbnail to the video attachment so it shows up in the Media Grid
             if thumbnail_id and thumbnail_id.isdigit():
@@ -493,7 +502,7 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
                 f"--post_id={post_id}",
                 "--porcelain",
             )
-            media_id = media_id_raw.split()[0] if media_id_raw else ""
+            media_id = _extract_id(media_id_raw)
             media_url = wp_cli.run("post", "get", media_id, "--field=guid")
             stripped = media_url.split(":", 1)[1] if media_url and ":" in media_url else media_url or ""
             audio_tag = f'<audio controls><source src="{stripped}" type="audio/mpeg"></audio>'
@@ -520,7 +529,7 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
                 f"--post_id={post_id}",
                 "--porcelain",
             )
-            media_id = media_id_raw.split()[0] if media_id_raw else ""
+            media_id = _extract_id(media_id_raw)
             data["post_type"] = "document"
             data["media_id"] = media_id
         except Exception as exc:
