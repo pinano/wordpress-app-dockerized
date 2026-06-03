@@ -1,3 +1,7 @@
+## v2026.06.03.4 (2026-06-03)
+
+- chore: update cron configuration, environment injection, volume mounts, and tmp directory initialization permissions (c451051)
+
 ## v2026.06.03.3 (2026-06-03)
 
 - chore: upgrade MariaDB to 12.3.2 and Valkey to 9.1-alpine3.23 (a00d674)
