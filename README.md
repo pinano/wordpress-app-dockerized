@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/badge.png" alt="Dockerized WordPress App Logo" width="220" />
+  <img src="docs/badge.webp" alt="Dockerized WordPress App Logo" width="220" />
 </p>
 
 <h1 align="center">Dockerized WordPress Application</h1>
