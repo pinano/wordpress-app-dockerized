@@ -1,3 +1,8 @@
+## v2026.06.03.3 (2026-06-03)
+
+- chore: upgrade MariaDB to 12.3.2 and Valkey to 9.1-alpine3.23 (a00d674)
+- feat: add make check-updates command and python script to scan for Docker image updates (fc7ba1b)
+
 ## v2026.06.03.2 (2026-06-03)
 
 - refactor: implement enhanced Apache security, performance tuning, and robust health monitoring systems (5899228)
