@@ -437,10 +437,14 @@ db: _ensure_env
 		fi; \
 		echo "✅ Import complete!"; \
 	elif [ "$$ACTION" = "export" ]; then \
-		PROJECT_ID=$$(grep '^PROJECT_ID=' .env | cut -d= -f2 | head -1 | tr -d '"'\''\r '); \
-		PROJECT_NAME=$$(grep '^PROJECT_NAME=' .env | cut -d= -f2 | head -1 | tr -d '"'\''\r '); \
+		PROJECT_ID=$$(grep '^PROJECT_ID=' .env 2>/dev/null | cut -d= -f2 | head -1 | tr -d '"'\''\r '); \
+		PROJECT_NAME=$$(grep '^PROJECT_NAME=' .env 2>/dev/null | cut -d= -f2 | head -1 | tr -d '"'\''\r '); \
 		TIMESTAMP=$$(date +%Y%m%d_%H%M%S); \
-		FILENAME="$${PROJECT_ID}-$${PROJECT_NAME}-$${TIMESTAMP}.sql"; \
+		if [ -n "$$PROJECT_ID" ]; then \
+			FILENAME="$${PROJECT_ID}-$${PROJECT_NAME}-$${TIMESTAMP}.sql"; \
+		else \
+			FILENAME="$${PROJECT_NAME}-$${TIMESTAMP}.sql"; \
+		fi; \
 		echo "📤 Exporting database to $$FILENAME..."; \
 		if command -v pv >/dev/null 2>&1; then \
 			. ./docker/scripts/set-env-vars.sh && docker compose exec -T db sh -c 'MYSQL_PWD=$${MARIADB_PASSWORD} mariadb-dump --single-transaction -u $${MARIADB_USER} $${MARIADB_DATABASE}' | sed 's/DEFINER[[:space:]]*=[[:space:]]*[^*]*\*/\*/g' | pv > "$$FILENAME"; \
@@ -454,7 +458,7 @@ db: _ensure_env
 		exit 1; \
 	else \
 		echo "🔌 Connecting to database..."; \
-		. ./docker/scripts/set-env-vars.sh && docker compose exec -T db sh -c 'MYSQL_PWD=$${MARIADB_PASSWORD} mariadb -u $${MARIADB_USER} $${MARIADB_DATABASE}'; \
+		. ./docker/scripts/set-env-vars.sh && docker compose exec db sh -c 'MYSQL_PWD=$${MARIADB_PASSWORD} mariadb -u $${MARIADB_USER} $${MARIADB_DATABASE}'; \
 	fi
 
 .PHONY: db-root
