@@ -105,6 +105,10 @@ $(MAKECMDGOALS):
 				printf "    - db import <file.sql>: Import a SQL dump file into the database (supports 'pv' progress bar).\n" ; \
 				printf "    - db export: Export a timestamped, single-transaction SQL dump to the host.\n" ; \
 				;; \
+			"db-root") \
+				printf "$(BOLD)make db-root$(RESET)\n" ; \
+				printf "  Connect to the database console as the 'root' database user.\n" ; \
+				;; \
 			"php-info") \
 				printf "$(BOLD)make php-info$(RESET)\n" ; \
 				printf "  Display current PHP configuration settings active in the running container.\n" ; \
@@ -248,6 +252,7 @@ help:
 	@printf "  $(CYAN)logs$(RESET)            Follow logs for all containers or a specific service (usage: make logs [service])\n\n"
 	@printf "$(BOLD)Database & Tools$(RESET)\n"
 	@printf "  $(CYAN)db$(RESET)              DB Tools (console, import, export). Run 'make db', 'make db import <file>', 'make db export'\n"
+	@printf "  $(CYAN)db-root$(RESET)         Access database console as root user\n"
 	@printf "  $(CYAN)php-info$(RESET)        Show active PHP configuration in the container\n"
 	@printf "  $(CYAN)opcache-clear$(RESET)   Clear OPcache for PHP-FPM pool (zero-downtime flush)\n"
 	@printf "  $(CYAN)ctop$(RESET)            Monitor containers using ctop\n\n"
@@ -458,6 +463,11 @@ db: _ensure_env
 		echo "🔌 Connecting to database..."; \
 		. ./docker/scripts/set-env-vars.sh && docker compose exec -T db sh -c 'MYSQL_PWD=$${MARIADB_PASSWORD} mariadb -u $${MARIADB_USER} $${MARIADB_DATABASE}'; \
 	fi
+
+.PHONY: db-root
+db-root: _ensure_env
+	@echo "🔌 Connecting to database as root..."
+	@. ./docker/scripts/set-env-vars.sh && docker compose exec -e MYSQL_PWD=$${DB_ROOT_PASS} db mariadb -u root $${DB_NAME}
 
 .PHONY: ctop
 ctop:
