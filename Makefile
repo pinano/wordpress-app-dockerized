@@ -210,6 +210,11 @@ $(MAKECMDGOALS):
 				printf "$(BOLD)make rollback$(RESET)\n" ; \
 				printf "  Interactively list recent git tags and roll back codebase to the selected version.\n" ; \
 				;; \
+			"check-updates") \
+				printf "$(BOLD)make check-updates$(RESET)\n" ; \
+				printf "  Scan docker-compose files and query Docker registries (Docker Hub, GHCR, Quay) to check\n" ; \
+				printf "  for newer image versions matching the active flavors. Offers to auto-apply updates.\n" ; \
+				;; \
 			"redis-info") \
 				printf "$(BOLD)make redis-info$(RESET)\n" ; \
 				printf "  Retrieve and display statistics from the Valkey/Redis caching server.\n" ; \
@@ -284,6 +289,7 @@ help:
 	@printf "  $(CYAN)release$(RESET)         Generate a new CalVer release, update CHANGELOG.md, and create a git tag\n"
 	@printf "  $(CYAN)update$(RESET)          Fetch and safely upgrade the codebase (usage: make update [version=vX])\n"
 	@printf "  $(CYAN)rollback$(RESET)        Interactively list recent tag versions and rollback to a selected one\n"
+	@printf "  $(CYAN)check-updates$(RESET)   Check for Docker image updates in compose files\n"
 	@if docker compose config --services 2>/dev/null | grep -q 'redis'; then \
 		printf "\n$(BOLD)Redis Management$(RESET)\n"; \
 		printf "  $(CYAN)redis-info$(RESET)      Show Redis server statistics\n"; \
@@ -641,6 +647,10 @@ update:
 .PHONY: rollback
 rollback:
 	@./docker/scripts/rollback.sh
+
+.PHONY: check-updates
+check-updates:
+	@python3 ./docker/scripts/check-image-updates.py
 
 # --- Sizing Profiles ---
 # Helper function to update a variable in .env (works on both macOS and Linux)
