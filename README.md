@@ -115,7 +115,7 @@ You can enable additional stack features for specific WordPress applications via
 | `make php-info` | Show active PHP configuration in the container |
 | `make ctop` | Monitor containers using ctop |
 | `make open-ports` | Expose DB & SFTP ports externally (0.0.0.0) |
-| `make close-ports` | Restrict DB & SFTP ports (127.0.0.1) |
+| `make close-ports` | Restrict DB & SFTP ports (DB to 172.17.0.1, SFTP to 127.0.0.1) |
 | `make open-db` / `close-db` | Expose or restrict only the DB |
 | `make redis-info` | Show Redis server statistics |
 | `make redis-monitor`| Monitor Redis commands in real-time |

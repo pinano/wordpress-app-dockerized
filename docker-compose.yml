@@ -222,7 +222,7 @@ services:
       - /etc/localtime:/etc/localtime:ro
       - ./mariadb_data:/var/lib/mysql
     ports:
-      - "${DB_BIND_IP:-127.0.0.1}:33${PROJECT_ID}:3306" # <--- Controlled by DB_BIND_IP and PROJECT_ID in .env
+      - "${DB_BIND_IP:-172.17.0.1}:33${PROJECT_ID}:3306" # <--- Controlled by DB_BIND_IP and PROJECT_ID in .env
     environment:
       TZ: ${TZ}
       MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASS}

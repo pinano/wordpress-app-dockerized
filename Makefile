@@ -27,7 +27,7 @@ help:
 	@echo ""
 	@echo "Port Management:"
 	@echo "  open-ports    Open DB & SFTP ports to the outside world (0.0.0.0)"
-	@echo "  close-ports   Close DB & SFTP ports (restrict to 127.0.0.1)"
+	@echo "  close-ports   Close DB & SFTP ports (restrict DB to 172.17.0.1, SFTP to 127.0.0.1)"
 	@echo "  open-db       Open only DB port"
 	@echo "  close-db      Close only DB port"
 	@echo "  open-sftp     Open only SFTP port"
@@ -253,8 +253,8 @@ open-ports: _ensure_env
 
 .PHONY: close-ports
 close-ports: _ensure_env
-	@echo "🔒 Closing DB and SFTP ports (127.0.0.1)..."
-	$(call set_env,DB_BIND_IP,127.0.0.1)
+	@echo "🔒 Closing DB (172.17.0.1) and SFTP (127.0.0.1) ports..."
+	$(call set_env,DB_BIND_IP,172.17.0.1)
 	$(call set_env,SFTP_BIND_IP,127.0.0.1)
 	@echo "✅ Ports configured to be closed. Run 'make restart' or 'docker compose up -d' to apply."
 
@@ -266,8 +266,8 @@ open-db: _ensure_env
 
 .PHONY: close-db
 close-db: _ensure_env
-	@echo "🔒 Closing DB port (127.0.0.1)..."
-	$(call set_env,DB_BIND_IP,127.0.0.1)
+	@echo "🔒 Closing DB port (172.17.0.1)..."
+	$(call set_env,DB_BIND_IP,172.17.0.1)
 	@echo "✅ DB port configured to be closed. Run 'make restart' or 'docker compose up -d' to apply."
 
 .PHONY: open-sftp

@@ -44,7 +44,7 @@ services:
 
 ### 3. Exposing Ports Externally
 
-By default, the MariaDB and SFTP ports are bound strictly to `127.0.0.1` for security in multi-tenant shared hosts. If you have an external management tool that needs direct access, override the port binding.
+By default, the MariaDB port is bound strictly to `172.17.0.1` and the SFTP port is bound to `127.0.0.1` for security in multi-tenant shared hosts. If you have an external management tool that needs direct access, override the port binding.
 
 ```yaml
 # docker-compose.override.yml

@@ -41,7 +41,7 @@ make db import file.sql            # Import dump
 make db export                     # Export dump (automatic timestamped filename)
 make validate                      # Validate .env before starting
 make sync                          # Sync .env with .env.dist (adds missing keys)
-make open-ports / close-ports      # Open/close DB+SFTP to the outside (0.0.0.0 vs 127.0.0.1)
+make open-ports / close-ports      # Open/close DB+SFTP to the outside (0.0.0.0 vs 172.17.0.1/127.0.0.1)
 make size-small/medium/large       # Apply resource profiles to .env
 ```
 
@@ -144,7 +144,7 @@ GALLERY MODE: TITLE → CONTENT (optional, SKIP) → LOCATION_STATE → MEDIA (m
 ### Docker / DevOps
 - Lightweight images. Centralized environment variables in `.env`.
 - Resources (CPU/RAM) always limited in `docker-compose.yml` with `deploy.resources`.
-- Sensitive ports (DB, SFTP) bound to `127.0.0.1` by default.
+- Sensitive ports (DB bound to `172.17.0.1`, SFTP to `127.0.0.1`) by default.
 
 ---
 

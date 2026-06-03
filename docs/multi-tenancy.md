@@ -31,7 +31,7 @@ While Docker can easily run hundreds of containers, you may encounter network bo
 If you reach these limits, it is usually time to transition from a single-host deployment to a multi-node Swarm or Kubernetes cluster (see `docs/docker-compose-override-examples.md`).
 
 ### Step 5: Avoid Port Collisions
-By default, the `docker-compose.yml` only exposes the MariaDB port directly to the `127.0.0.1` host interface for debugging purposes.
+By default, the `docker-compose.yml` only exposes the MariaDB port directly to the `172.17.0.1` interface (the Docker bridge gateway) for debugging and container discovery purposes.
 The port is calculated automatically using `PROJECT_ID` (e.g., MariaDB maps to `33${PROJECT_ID}`).
 If you are running multiple projects, you **must** assign a unique `PROJECT_ID` in each project's `.env` file to ensure ports don't collide.
 * Example Project A: `PROJECT_ID=001` → MariaDB on port `33001`
