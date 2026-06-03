@@ -1,3 +1,12 @@
+## v2026.06.03.2 (2026-06-03)
+
+- refactor: implement enhanced Apache security, performance tuning, and robust health monitoring systems (5899228)
+- docs: update badge image extension to webp in README.md (9928804)
+- docs: modernize README.md layout with logo, technology badges, and comprehensive commands list (b70618b)
+- chore: handle offline/ssh failures when fetching tags in release scripts (b9e5102)
+- chore: align .env.dist with zend-app-dockerized structure (f07f7a1)
+- chore: add db-root target to Makefile (48d21f6)
+
 ## v2026.06.03.1 (2026-06-03)
 
 - chore: test new commit (c334b7e)
