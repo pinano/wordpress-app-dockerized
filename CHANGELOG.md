@@ -1,3 +1,7 @@
+## v2026.06.03.1 (2026-06-03)
+
+- chore: test new commit (c334b7e)
+
 ## v2026.06.03 (2026-06-03)
 
 - feat: enhance Makefile and implement release system (ed6ad5b)
