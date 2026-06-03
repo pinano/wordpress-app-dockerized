@@ -155,7 +155,7 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - ./docker/php/custom.ini:/usr/local/etc/php/conf.d/99-custom.ini:ro
-      - ./docker/scripts/crontab:/etc/cron.d/app-cron:ro
+      - ./docker/scripts/crontab:/etc/cron.d/app-cron
       - ./docroot:/var/www/html
       - type: tmpfs
         target: /var/www/html/tmp
@@ -184,7 +184,7 @@ services:
       DB_NAME: ${DB_NAME}
       DB_USER: ${DB_USER}
       DB_PASS: ${DB_PASS}
-    command: cron -f
+    command: sh -c "printenv | grep -E '^(DB_HOST|DB_NAME|DB_USER|DB_PASS|APP_ENV|TZ|PHP_|USER_ID|GROUP_ID)=' > /etc/environment && chown root:root /etc/cron.d/app-cron && chmod 644 /etc/cron.d/app-cron && cron -f"
     restart: unless-stopped
     networks:
       - backnet
@@ -305,7 +305,7 @@ services:
     user: ${USER_ID:-1000}:${GROUP_ID:-1000}
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      - ./docroot/public:/var/www/html
+      - ./docroot:/var/www/html
       - ./wp-cli.yml:/wp-cli.yml:ro
     environment:
       TZ: ${TZ}

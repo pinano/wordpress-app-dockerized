@@ -3,6 +3,13 @@
 # Initialization script for the Wordpress Docker container.
 # Runs automatically via the entrypoint system (/etc/entrypoint.d/)
 
+# --- TMP DIRECTORY STRUCTURE ---
+# Required because /var/www/html/tmp is mounted as tmpfs (wiped on restart)
+echo "📁 Initializing /var/www/html/tmp ownership and permissions..."
+mkdir -p /var/www/html/tmp
+chown -R www-data:www-data /var/www/html/tmp
+chmod -R 775 /var/www/html/tmp
+
 # --- PHP ERROR LOG FORWARDER ---
 # Workaround for S6 overlay masking FPM worker stderr output.
 # PHP writes errors to a file, and this tail process forwards them to PID 1 (Docker logs).
