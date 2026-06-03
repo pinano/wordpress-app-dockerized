@@ -1,3 +1,7 @@
+## v2026.06.03.5 (2026-06-03)
+
+- fix: suppress grep errors and handle missing PROJECT_ID in database export filename generation (4273e5a)
+
 ## v2026.06.03.4 (2026-06-03)
 
 - chore: update cron configuration, environment injection, volume mounts, and tmp directory initialization permissions (c451051)
