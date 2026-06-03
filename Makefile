@@ -97,6 +97,11 @@ $(MAKECMDGOALS):
 				printf "  Special: 'make logs wordpress' tails the WordPress debug log file at\n" ; \
 				printf "  /var/www/html/public/wp-content/debug.log.\n" ; \
 				;; \
+			"logs-slow") \
+				printf "$(BOLD)make logs-slow$(RESET)\n" ; \
+				printf "  Stream PHP-FPM slow request logs in real-time to identify performance bottlenecks.\n" ; \
+				printf "  Tails /var/www/html/tmp/php-fpm-slow.log inside the app container.\n" ; \
+				;; \
 			"db") \
 				printf "$(BOLD)make db [action] [file]$(RESET)\n" ; \
 				printf "  Run database management tools.\n" ; \
@@ -249,7 +254,8 @@ help:
 	@printf "  $(CYAN)clean$(RESET)           Clean up everything, removing volumes (requires confirmation)\n\n"
 	@printf "$(BOLD)Shell & Logs$(RESET)\n"
 	@printf "  $(CYAN)shell$(RESET)           Open a shell in a container (usage: make shell [service], default: app)\n"
-	@printf "  $(CYAN)logs$(RESET)            Follow logs for all containers or a specific service (usage: make logs [service])\n\n"
+	@printf "  $(CYAN)logs$(RESET)            Follow logs for all containers or a specific service (usage: make logs [service])\n"
+	@printf "  $(CYAN)logs-slow$(RESET)       Follow PHP-FPM slow request logs in real-time\n\n"
 	@printf "$(BOLD)Database & Tools$(RESET)\n"
 	@printf "  $(CYAN)db$(RESET)              DB Tools (console, import, export). Run 'make db', 'make db import <file>', 'make db export'\n"
 	@printf "  $(CYAN)db-root$(RESET)         Access database console as root user\n"
@@ -289,32 +295,8 @@ help:
 .PHONY: init
 init:
 	@if [ ! -f .env ]; then \
-		echo "⚙️  Initializing .env from .env.dist..."; \
-		cp .env.dist .env; \
-		dir_name=$$(basename "$$(pwd)"); \
-		pid=$$(echo "$$dir_name" | cut -d'-' -f1); \
-		if echo "$$pid" | grep -Eq '^[0-9]+$$'; then \
-			pname=$$(echo "$$dir_name" | cut -d'-' -f2-); \
-			echo "🔍 Detected PROJECT_ID: $$pid, PROJECT_NAME: $$pname"; \
-			if [ "$$(uname)" = "Darwin" ]; then \
-				sed -i '' "s|^PROJECT_ID=.*|PROJECT_ID=$$pid|" .env; \
-				sed -i '' "s|^PROJECT_NAME=.*|PROJECT_NAME=$$pname|" .env; \
-			else \
-				sed -i "s|^PROJECT_ID=.*|PROJECT_ID=$$pid|" .env; \
-				sed -i "s|^PROJECT_NAME=.*|PROJECT_NAME=$$pname|" .env; \
-			fi; \
-		else \
-			printf "🔢 Enter PROJECT_ID (e.g., 999): " && read pid; \
-			if [ -n "$$pid" ]; then \
-				if [ "$$(uname)" = "Darwin" ]; then \
-					sed -i '' "s|^PROJECT_ID=.*|PROJECT_ID=$$pid|" .env; \
-				else \
-					sed -i "s|^PROJECT_ID=.*|PROJECT_ID=$$pid|" .env; \
-				fi; \
-				echo "✅ PROJECT_ID set to $$pid"; \
-			fi; \
-		fi; \
-		echo "✅ .env created. Please review variables before starting."; \
+		chmod +x docker/scripts/init-env.sh; \
+		./docker/scripts/init-env.sh; \
 	else \
 		echo "ℹ️  .env already exists."; \
 	fi
@@ -393,6 +375,11 @@ logs:
 	else \
 		. ./docker/scripts/set-env-vars.sh && docker compose logs -f $$SERVICE; \
 	fi
+
+.PHONY: logs-slow
+logs-slow: _ensure_env
+	@echo "📋 Tailing PHP-FPM slow log (/var/www/html/tmp/php-fpm-slow.log)..."
+	@. ./docker/scripts/set-env-vars.sh && docker compose exec app tail -n 100 -f /var/www/html/tmp/php-fpm-slow.log
 
 .PHONY: shell
 shell:

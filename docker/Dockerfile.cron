@@ -28,10 +28,9 @@ RUN usermod -u ${USER_ID} www-data && \
 # -----------------
 
 # --- APP INITIALIZATION ---
-# Copy the initialization script to run on startup
-# Auto-generates healthcheck.php
-#COPY docker/scripts/init-app.sh /etc/entrypoint.d/99-init-app.sh
-#RUN chmod +x /etc/entrypoint.d/99-init-app.sh
+# Copy the maintenance script
+COPY docker/scripts/maintenance.sh /usr/local/bin/maintenance.sh
+RUN chmod +x /usr/local/bin/maintenance.sh
 # -----------------
 
 # Install the same PHP extensions as the main app image

@@ -22,6 +22,7 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - ./docker/apache/httpd.conf:/etc/apache2/vhost-templates/http.conf:ro
+      - ./docker/apache/security.conf:/etc/apache2/conf-enabled/security.conf:ro
       - ./docker/php/custom.ini:/usr/local/etc/php/conf.d/99-custom.ini:ro
       - ./docker/php/zz-docker.conf:/usr/local/etc/php-fpm.d/zz-docker.conf:ro
       - ./docroot:/var/www/html
@@ -61,9 +62,12 @@ services:
       PHP_OPCACHE_MAX_ACCELERATED_FILES: ${PHP_OPCACHE_MAX_ACCELERATED_FILES:-20000}
       PHP_OPCACHE_VALIDATE_TIMESTAMPS: ${PHP_OPCACHE_VALIDATE_TIMESTAMPS:-${APP_ENV_PHP_OPCACHE_VALIDATE_TIMESTAMPS:-0}}
       PHP_OPCACHE_REVALIDATE_FREQ: ${PHP_OPCACHE_REVALIDATE_FREQ:-${APP_ENV_PHP_OPCACHE_REVALIDATE_FREQ:-60}}
+      PHP_OPCACHE_HUGE_CODE_PAGES: ${PHP_OPCACHE_HUGE_CODE_PAGES:-0}
+      PHP_OPCACHE_INTERNED_STRINGS_BUFFER: ${PHP_OPCACHE_INTERNED_STRINGS_BUFFER:-16}
       # PHP-FPM Pool Tuning
       PHP_FPM_PM_MAX_CHILDREN: ${PHP_FPM_PM_MAX_CHILDREN:-10}
       PHP_FPM_PM_MAX_REQUESTS: ${PHP_FPM_PM_MAX_REQUESTS:-500}
+      PHP_FPM_SLOWLOG_TIMEOUT: ${PHP_FPM_SLOWLOG_TIMEOUT:-10s}
       # Database
       DB_HOST: ${DB_HOST:-db}
       DB_NAME: ${DB_NAME}
@@ -173,6 +177,8 @@ services:
       PHP_MAX_INPUT_VARS: ${PHP_MAX_INPUT_VARS:-3000}
       PHP_MAX_EXECUTION_TIME: 0 # No limit for CLI
       PHP_MEMORY_LIMIT: ${PHP_MEMORY_LIMIT:-512M}
+      PHP_OPCACHE_HUGE_CODE_PAGES: ${PHP_OPCACHE_HUGE_CODE_PAGES:-0}
+      PHP_OPCACHE_INTERNED_STRINGS_BUFFER: ${PHP_OPCACHE_INTERNED_STRINGS_BUFFER:-16}
       # Database
       DB_HOST: ${DB_HOST:-db}
       DB_NAME: ${DB_NAME}
@@ -201,6 +207,8 @@ services:
       - --sort-buffer-size=256K
       - --tmp-table-size=32M
       - --max-heap-table-size=32M
+      - --table-open-cache=${DB_TABLE_OPEN_CACHE:-2000}
+      - --table-definition-cache=${DB_TABLE_DEFINITION_CACHE:-1400}
     deploy:
       resources:
         limits:

@@ -13,16 +13,43 @@ chmod 664 "$PHP_ERROR_LOG"
 tail -F "$PHP_ERROR_LOG" > /proc/1/fd/2 2>/dev/null &
 echo "✅ PHP error log forwarder started (→ Docker logs)"
 
+# --- PHP-FPM SLOW LOG ---
+# Pre-creates the slow log file with correct ownership so FPM workers can write to it.
+PHP_FPM_SLOW_LOG=/var/www/html/tmp/php-fpm-slow.log
+touch "$PHP_FPM_SLOW_LOG"
+chown www-data:www-data "$PHP_FPM_SLOW_LOG"
+chmod 664 "$PHP_FPM_SLOW_LOG"
+echo "✅ PHP-FPM slow log file pre-created"
+
 # --- HEALTHCHECK ---
-# Auto-generate a minimal healthcheck.php if it doesn't already exist.
-# This allows Docker healthchecks to verify PHP-FPM is responding without
-# depending on the application's routing or framework.
+# Auto-generate a healthcheck.php that validates both PHP-FPM and database connectivity.
+# This allows Docker healthchecks and Traefik to detect actual service availability,
+# not just that PHP-FPM is responding.
 HEALTHCHECK_FILE="${APACHE_DOCUMENT_ROOT:-/var/www/html/public}/healthcheck.php"
 mkdir -p "$(dirname "$HEALTHCHECK_FILE")"
 if [ ! -f "$HEALTHCHECK_FILE" ]; then
-    echo '<?php http_response_code(200); echo "ok";' > "$HEALTHCHECK_FILE"
+    cat > "$HEALTHCHECK_FILE" <<'HEALTHCHECK_EOF'
+<?php
+// Auto-generated healthcheck — validates PHP-FPM + MariaDB connectivity.
+// Docker healthcheck interval is typically 60s, so one DB connection per minute is negligible.
+try {
+    $pdo = new PDO(
+        'mysql:host=' . getenv('DB_HOST') . ';dbname=' . getenv('DB_NAME'),
+        getenv('DB_USER'),
+        getenv('DB_PASS'),
+        [PDO::ATTR_TIMEOUT => 3, PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
+    );
+    $pdo->query('SELECT 1');
+    $pdo = null;
+    http_response_code(200);
+    echo 'ok';
+} catch (Exception $e) {
+    http_response_code(503);
+    echo 'db_error';
+}
+HEALTHCHECK_EOF
     chown www-data:www-data "$HEALTHCHECK_FILE"
-    echo "✅ Healthcheck created at $HEALTHCHECK_FILE"
+    echo "✅ Healthcheck created at $HEALTHCHECK_FILE (with DB validation)"
 else
     echo "ℹ️  Healthcheck already exists at $HEALTHCHECK_FILE, skipping."
 fi
