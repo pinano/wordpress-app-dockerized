@@ -1,58 +1,285 @@
-# Makefile for Dockerized Wordpress App
+# Makefile for Dockerized WordPress App
 
-# Default target
+# Colors for help menu
+BOLD  := \033[1m
+CYAN  := \033[36m
+RESET := \033[0m
+
+# Dynamic port discovery from .env
+PROJECT_ID_RAW := $(shell grep '^PROJECT_ID=' .env 2>/dev/null | cut -d= -f2 | tr -d '"'\''\r ')
+PROJECT_ID     := $(if $(PROJECT_ID_RAW),$(PROJECT_ID_RAW),999)
+DB_PORT        := 33$(PROJECT_ID)
+SFTP_PORT      := 22$(PROJECT_ID)
+
+# Detect if 'help' is one of the goals, and there is at least one other goal.
+# E.g., 'make start help' or 'make help start'.
+SHOW_HELP :=
+ifneq ($(filter help,$(MAKECMDGOALS)),)
+  ifneq ($(filter-out help,$(MAKECMDGOALS)),)
+    SHOW_HELP := 1
+  endif
+endif
+
+ifeq ($(SHOW_HELP),1)
+
+FIRST_GOAL := $(firstword $(filter-out help,$(MAKECMDGOALS)))
+
+.PHONY: $(MAKECMDGOALS)
+$(MAKECMDGOALS):
+	@if [ "$@" = "$(FIRST_GOAL)" ]; then \
+		case "$@" in \
+			"doctor") \
+				printf "$(BOLD)make doctor$(RESET)\n" ; \
+				printf "  Run diagnostic checks on the Docker environment and port configurations.\n" ; \
+				printf "  Checks include:\n" ; \
+				printf "    - Docker daemon accessibility.\n" ; \
+				printf "    - Host Transparent Huge Pages (THP) status (relevant for OPcache).\n" ; \
+				printf "    - Detailed check on database ($(DB_PORT)) and SFTP ($(SFTP_PORT)) ports.\n" ; \
+				printf "    - Alert if ports are bound to 0.0.0.0 or 172.17.0.1 and if they are blocked.\n" ; \
+				;; \
+			"status") \
+				printf "$(BOLD)make status$(RESET)\n" ; \
+				printf "  Show the status of all containers in the stack.\n" ; \
+				printf "  Equivalent to running 'docker compose ps'.\n" ; \
+				;; \
+			"services") \
+				printf "$(BOLD)make services$(RESET)\n" ; \
+				printf "  List all services defined in the docker-compose configuration.\n" ; \
+				printf "  Use these names for target-specific commands like 'make shell <service>'.\n" ; \
+				;; \
+			"config") \
+				printf "$(BOLD)make config$(RESET)\n" ; \
+				printf "  Validate and render the active Docker Compose configuration.\n" ; \
+				printf "  Displays the parsed docker-compose file with environment variables expanded.\n" ; \
+				;; \
+			"start") \
+				printf "$(BOLD)make start$(RESET)\n" ; \
+				printf "  Start the Docker stack in the background.\n" ; \
+				printf "  Before starting, it will automatically:\n" ; \
+				printf "    1. Initialize the .env file from .env.dist if missing.\n" ; \
+				printf "    2. Sync missing .env keys from .env.dist.\n" ; \
+				printf "    3. Run configuration validation to check for security/performance issues.\n" ; \
+				;; \
+			"stop") \
+				printf "$(BOLD)make stop$(RESET)\n" ; \
+				printf "  Stop all running containers in the stack.\n" ; \
+				printf "  Clears networks and orphaned containers. Safe: does NOT delete database volumes.\n" ; \
+				;; \
+			"restart") \
+				printf "$(BOLD)make restart$(RESET)\n" ; \
+				printf "  Perform a clean restart of the stack.\n" ; \
+				printf "  Executes 'make stop' followed by 'make start'. Recommended to apply .env changes.\n" ; \
+				;; \
+			"rebuild") \
+				printf "$(BOLD)make rebuild [service]$(RESET)\n" ; \
+				printf "  Rebuild Docker images for the stack.\n" ; \
+				printf "  Provide an optional service name to rebuild only that service (e.g. 'make rebuild app').\n" ; \
+				;; \
+			"pull") \
+				printf "$(BOLD)make pull$(RESET)\n" ; \
+				printf "  Pull latest versions of the base Docker images specified in the compose file.\n" ; \
+				;; \
+			"clean") \
+				printf "$(BOLD)make clean$(RESET)\n" ; \
+				printf "  Tear down everything, including persistent volumes.\n" ; \
+				printf "  $(BOLD)$(CYAN)WARNING:$(RESET) This deletes all database volumes and data permanently!\n" ; \
+				printf "  Requires explicit user confirmation [y/N] before proceeding.\n" ; \
+				;; \
+			"shell") \
+				printf "$(BOLD)make shell [service]$(RESET)\n" ; \
+				printf "  Open an interactive terminal/shell inside a running container.\n" ; \
+				printf "  Defaults to the 'app' container. Usage: 'make shell [service]' (e.g., 'make shell db').\n" ; \
+				;; \
+			"logs") \
+				printf "$(BOLD)make logs [service|wordpress]$(RESET)\n" ; \
+				printf "  Stream real-time log output for all containers or a specific service.\n" ; \
+				printf "  Usage: 'make logs' or 'make logs [service]' (e.g., 'make logs app').\n" ; \
+				printf "  Special: 'make logs wordpress' tails the WordPress debug log file at\n" ; \
+				printf "  /var/www/html/public/wp-content/debug.log.\n" ; \
+				;; \
+			"db") \
+				printf "$(BOLD)make db [action] [file]$(RESET)\n" ; \
+				printf "  Run database management tools.\n" ; \
+				printf "  Actions:\n" ; \
+				printf "    - (No action): Open an interactive MariaDB console in the 'db' container.\n" ; \
+				printf "    - db import <file.sql>: Import a SQL dump file into the database (supports 'pv' progress bar).\n" ; \
+				printf "    - db export: Export a timestamped, single-transaction SQL dump to the host.\n" ; \
+				;; \
+			"php-info") \
+				printf "$(BOLD)make php-info$(RESET)\n" ; \
+				printf "  Display current PHP configuration settings active in the running container.\n" ; \
+				;; \
+			"opcache-clear") \
+				printf "$(BOLD)make opcache-clear$(RESET)\n" ; \
+				printf "  Clear PHP OPcache bytecode cache for the PHP-FPM pool (zero-downtime flush).\n" ; \
+				;; \
+			"ctop") \
+				printf "$(BOLD)make ctop$(RESET)\n" ; \
+				printf "  Monitor project containers in real-time using ctop (CPU, MEM, NET statistics).\n" ; \
+				;; \
+			"open-ports") \
+				printf "$(BOLD)make open-ports$(RESET)\n" ; \
+				printf "  Configure .env to bind DB ($(DB_PORT)) and SFTP ($(SFTP_PORT)) ports to 0.0.0.0 (accessible externally).\n" ; \
+				printf "  $(BOLD)$(CYAN)WARNING:$(RESET) Exposing database ($(DB_PORT)) and SFTP ($(SFTP_PORT)) ports externally is a security risk. Secure your host with a firewall!\n" ; \
+				printf "  Note: Run 'make restart' or 'docker compose up -d' to apply.\n" ; \
+				;; \
+			"close-ports") \
+				printf "$(BOLD)make close-ports$(RESET)\n" ; \
+				printf "  Configure .env to restrict DB ($(DB_PORT)) to 172.17.0.1 and SFTP ($(SFTP_PORT)) to 127.0.0.1.\n" ; \
+				printf "  Note: Run 'make restart' or 'docker compose up -d' to apply.\n" ; \
+				;; \
+			"open-db") \
+				printf "$(BOLD)make open-db$(RESET)\n" ; \
+				printf "  Configure .env to bind the DB port ($(DB_PORT)) to 0.0.0.0 (accessible externally).\n" ; \
+				printf "  $(BOLD)$(CYAN)WARNING:$(RESET) Exposing the database port ($(DB_PORT)) externally is a security risk. Secure your host with a firewall!\n" ; \
+				printf "  Note: Run 'make restart' or 'docker compose up -d' to apply.\n" ; \
+				;; \
+			"close-db") \
+				printf "$(BOLD)make close-db$(RESET)\n" ; \
+				printf "  Configure .env to restrict the DB port ($(DB_PORT)) to 172.17.0.1.\n" ; \
+				printf "  Note: Run 'make restart' or 'docker compose up -d' to apply.\n" ; \
+				;; \
+			"open-sftp") \
+				printf "$(BOLD)make open-sftp$(RESET)\n" ; \
+				printf "  Configure .env to bind the SFTP port ($(SFTP_PORT)) to 0.0.0.0 (accessible externally).\n" ; \
+				printf "  $(BOLD)$(CYAN)WARNING:$(RESET) Exposing the SFTP port ($(SFTP_PORT)) externally is a security risk. Secure your host with a firewall!\n" ; \
+				printf "  Note: Run 'make restart' or 'docker compose up -d' to apply.\n" ; \
+				;; \
+			"close-sftp") \
+				printf "$(BOLD)make close-sftp$(RESET)\n" ; \
+				printf "  Configure .env to restrict the SFTP port ($(SFTP_PORT)) to 127.0.0.1 (localhost only).\n" ; \
+				printf "  Note: Run 'make restart' or 'docker compose up -d' to apply.\n" ; \
+				;; \
+			"size-small") \
+				printf "$(BOLD)make size-small$(RESET)\n" ; \
+				printf "  Apply SMALL sizing profile to .env (< 500 visits/day).\n" ; \
+				printf "  Restricts resource limits. Perfect for local dev and low-memory servers.\n" ; \
+				printf "  Note: Run 'make restart' to apply changes.\n" ; \
+				;; \
+			"size-medium") \
+				printf "$(BOLD)make size-medium$(RESET)\n" ; \
+				printf "  Apply MEDIUM sizing profile to .env (500 - 5000 visits/day).\n" ; \
+				printf "  Balanced resource allocation for moderate production environments.\n" ; \
+				printf "  Note: Run 'make restart' to apply changes.\n" ; \
+				;; \
+			"size-large") \
+				printf "$(BOLD)make size-large$(RESET)\n" ; \
+				printf "  Apply LARGE sizing profile to .env (> 5000 visits/day).\n" ; \
+				printf "  High-performance configuration. Allocates more RAM.\n" ; \
+				printf "  Note: Run 'make restart' to apply changes.\n" ; \
+				;; \
+			"size-show") \
+				printf "$(BOLD)make size-show$(RESET)\n" ; \
+				printf "  Show current sizing configuration parameters and identify active profile.\n" ; \
+				;; \
+			"crontab-init") \
+				printf "$(BOLD)make crontab-init$(RESET)\n" ; \
+				printf "  Create an example crontab file under 'docker/scripts/crontab' if it does not exist.\n" ; \
+				;; \
+			"secure") \
+				printf "$(BOLD)make secure$(RESET)\n" ; \
+				printf "  Lock the WordPress site. Core WordPress files become Read-Only.\n" ; \
+				printf "  Folder uploads/cache remain writable for standard operations.\n" ; \
+				;; \
+			"insecure") \
+				printf "$(BOLD)make insecure$(RESET)\n" ; \
+				printf "  Unlock the WordPress site. Enable write access for updates or maintenance.\n" ; \
+				;; \
+			"fix-permissions") \
+				printf "$(BOLD)make fix-permissions$(RESET)\n" ; \
+				printf "  Restore standard ownership and base permissions (644/755) to WordPress files.\n" ; \
+				;; \
+			"release") \
+				printf "$(BOLD)make release$(RESET)\n" ; \
+				printf "  Generate a new CalVer release (vYYYY.MM.DD[.micro]), update CHANGELOG.md, and create/push a git tag.\n" ; \
+				;; \
+			"update") \
+				printf "$(BOLD)make update [version=vX]$(RESET)\n" ; \
+				printf "  Fetch changes and safely upgrade the codebase to a specific version or latest tag.\n" ; \
+				;; \
+			"rollback") \
+				printf "$(BOLD)make rollback$(RESET)\n" ; \
+				printf "  Interactively list recent git tags and roll back codebase to the selected version.\n" ; \
+				;; \
+			"redis-info") \
+				printf "$(BOLD)make redis-info$(RESET)\n" ; \
+				printf "  Retrieve and display statistics from the Valkey/Redis caching server.\n" ; \
+				;; \
+			"redis-monitor") \
+				printf "$(BOLD)make redis-monitor$(RESET)\n" ; \
+				printf "  Stream incoming Redis commands in real-time (useful for debugging cache keys).\n" ; \
+				;; \
+			"redis-ping") \
+				printf "$(BOLD)make redis-ping$(RESET)\n" ; \
+				printf "  Ping the Redis container to verify it is responsive.\n" ; \
+				;; \
+			"help") \
+				printf "$(BOLD)make help$(RESET)\n" ; \
+				printf "  Show the general help menu listing all available targets.\n" ; \
+				;; \
+			*) \
+				printf "Unknown target: $@\n" ; \
+				printf "For a list of all targets, run: make help\n" ; \
+				;; \
+		esac; \
+	fi
+
+else
+
 .PHONY: help
 help:
-	@echo "Usage: make [target]"
-	@echo ""
-	@echo "Targets:"
-	@echo "  help          Show this help message"
-	@echo "  init          Initialize environment (.env)"
-	@echo "  start         Start the stack (creates & validates .env if missing)"
-	@echo "  stop          Stop the stack and remove orphans"
-	@echo "  restart       Restart the stack"
-	@echo "  rebuild       Rebuild services from Dockerfile (usage: make rebuild [service])"
-	@echo "  status        Show stack status (docker compose ps)"
-	@echo "  services      List available services"
-	@echo "  validate      Validate .env against minimum requirements"
-	@echo "  sync          Synchronize .env with .env.dist (Add missing keys)"
-	@echo "  logs          Follow logs for all containers or a specific service (usage: make logs [service])"
-	@echo "  shell         Open a shell in a container (usage: make shell [service], default: app)"
-	@echo "  pull          Pull latest images"
-	@echo "  clean         Clean up everything, removing volumes (Requires confirmation)"
-	@echo "  config        Validate Docker Compose configuration"
-	@echo "  php-info      Show active PHP configuration in the container (OPcache, Memory, Errors...)"
-	@echo "  db            DB Tools (console, import, export). Run 'make db', 'make db import <file>', 'make db export'"
-	@echo "  ctop          Monitor containers using ctop"
-	@echo ""
-	@echo "Port Management:"
-	@echo "  open-ports    Open DB & SFTP ports to the outside world (0.0.0.0)"
-	@echo "  close-ports   Close DB & SFTP ports (restrict DB to 172.17.0.1, SFTP to 127.0.0.1)"
-	@echo "  open-db       Open only DB port"
-	@echo "  close-db      Close only DB port"
-	@echo "  open-sftp     Open only SFTP port"
-	@echo "  close-sftp    Close only SFTP port"
+	@printf "$(BOLD)Usage:$(RESET) make [target] [service]\n"
+	@printf "For detailed help on any command, run: make <target> help\n\n"
+	@printf "$(BOLD)General$(RESET)\n"
+	@printf "  $(CYAN)help$(RESET)            Show this help message\n"
+	@printf "  $(CYAN)doctor$(RESET)          Run diagnostic checks (port conflicts, host transparent huge pages)\n"
+	@printf "  $(CYAN)status$(RESET)          Show stack status (docker compose ps)\n"
+	@printf "  $(CYAN)services$(RESET)        List available services\n"
+	@printf "  $(CYAN)config$(RESET)          Validate Docker Compose configuration\n\n"
+	@printf "$(BOLD)Core Lifecycle$(RESET)\n"
+	@printf "  $(CYAN)start$(RESET)           Start the stack (creates, syncs & validates .env if missing)\n"
+	@printf "  $(CYAN)stop$(RESET)            Stop the stack and remove orphans\n"
+	@printf "  $(CYAN)restart$(RESET)         Restart the stack\n"
+	@printf "  $(CYAN)rebuild$(RESET)         Rebuild services from Dockerfile (usage: make rebuild [service])\n"
+	@printf "  $(CYAN)pull$(RESET)            Pull latest images\n"
+	@printf "  $(CYAN)clean$(RESET)           Clean up everything, removing volumes (requires confirmation)\n\n"
+	@printf "$(BOLD)Shell & Logs$(RESET)\n"
+	@printf "  $(CYAN)shell$(RESET)           Open a shell in a container (usage: make shell [service], default: app)\n"
+	@printf "  $(CYAN)logs$(RESET)            Follow logs for all containers or a specific service (usage: make logs [service])\n\n"
+	@printf "$(BOLD)Database & Tools$(RESET)\n"
+	@printf "  $(CYAN)db$(RESET)              DB Tools (console, import, export). Run 'make db', 'make db import <file>', 'make db export'\n"
+	@printf "  $(CYAN)php-info$(RESET)        Show active PHP configuration in the container\n"
+	@printf "  $(CYAN)opcache-clear$(RESET)   Clear OPcache for PHP-FPM pool (zero-downtime flush)\n"
+	@printf "  $(CYAN)ctop$(RESET)            Monitor containers using ctop\n\n"
+	@printf "$(BOLD)Port Management$(RESET)\n"
+	@printf "  $(CYAN)open-ports$(RESET)      Open DB ($(DB_PORT)) & SFTP ($(SFTP_PORT)) ports to the outside world (0.0.0.0)\n"
+	@printf "  $(CYAN)close-ports$(RESET)     Close DB ($(DB_PORT)) & SFTP ($(SFTP_PORT)) ports (restrict DB to 172.17.0.1, SFTP to 127.0.0.1)\n"
+	@printf "  $(CYAN)open-db$(RESET)         Open only DB port ($(DB_PORT))\n"
+	@printf "  $(CYAN)close-db$(RESET)        Close only DB port ($(DB_PORT))\n"
+	@printf "  $(CYAN)open-sftp$(RESET)       Open only SFTP port ($(SFTP_PORT))\n"
+	@printf "  $(CYAN)close-sftp$(RESET)      Close only SFTP port ($(SFTP_PORT))\n\n"
+	@printf "$(BOLD)Sizing Profiles$(RESET)\n"
+	@printf "  $(CYAN)size-small$(RESET)      Configure .env for low-traffic app (< 500 visits/day)\n"
+	@printf "  $(CYAN)size-medium$(RESET)     Configure .env for medium-traffic app (500-5000 visits/day)\n"
+	@printf "  $(CYAN)size-large$(RESET)      Configure .env for high-traffic app (> 5000 visits/day)\n"
+	@printf "  $(CYAN)size-show$(RESET)       Show current sizing configuration\n\n"
+	@printf "$(BOLD)Cron Management$(RESET)\n"
+	@printf "  $(CYAN)crontab-init$(RESET)    Create example crontab file\n\n"
+	@printf "$(BOLD)Security Management$(RESET)\n"
+	@printf "  $(CYAN)secure$(RESET)            Lock WordPress core files (Read-Only)\n"
+	@printf "  $(CYAN)insecure$(RESET)          Unlock WordPress core files (Write access for maintenance)\n"
+	@printf "  $(CYAN)fix-permissions$(RESET)   Fix ownership and base permissions\n\n"
+	@printf "$(BOLD)Versioning & Updates$(RESET)\n"
+	@printf "  $(CYAN)release$(RESET)         Generate a new CalVer release, update CHANGELOG.md, and create a git tag\n"
+	@printf "  $(CYAN)update$(RESET)          Fetch and safely upgrade the codebase (usage: make update [version=vX])\n"
+	@printf "  $(CYAN)rollback$(RESET)        Interactively list recent tag versions and rollback to a selected one\n"
 	@if docker compose config --services 2>/dev/null | grep -q 'redis'; then \
-		echo ""; \
-		echo "Redis Management:"; \
-		echo "  redis-info    Show Redis server statistics"; \
-		echo "  redis-monitor Monitor Redis commands in real-time"; \
-		echo "  redis-ping    Ping Redis server"; \
+		printf "\n$(BOLD)Redis Management$(RESET)\n"; \
+		printf "  $(CYAN)redis-info$(RESET)      Show Redis server statistics\n"; \
+		printf "  $(CYAN)redis-monitor$(RESET)   Monitor Redis commands in real-time\n"; \
+		printf "  $(CYAN)redis-ping$(RESET)      Ping Redis server\n"; \
 	fi
-	@echo ""
-	@echo "Cron Management:"
-	@echo "  crontab-init  Create example crontab file"
-	@echo ""
-	@echo "Sizing:"
-	@echo "  size-small    Configure .env for low-traffic app (< 500 visits/day)"
-	@echo "  size-medium   Configure .env for medium-traffic app (500-5000 visits/day)"
-	@echo "  size-large    Configure .env for high-traffic app (> 5000 visits/day)"
-	@echo "  size-show     Show current sizing configuration"
-	@echo ""
-	@echo "Security Management:"
-	@echo "  secure          Lock WordPress core files (Read-Only)"
-	@echo "  insecure        Unlock WordPress core files (Write access for maintenance)"
-	@echo "  fix-permissions Fix ownership and base permissions"
+	@printf "\n"
 
 .PHONY: init
 init:
@@ -91,6 +318,8 @@ init:
 start:
 	@if [ ! -f .env ]; then \
 		$(MAKE) --no-print-directory init || exit 1; \
+	else \
+		$(MAKE) --no-print-directory sync || exit 1; \
 	fi
 	@$(MAKE) --no-print-directory validate
 	@echo "🐳 Starting containers..."
@@ -210,8 +439,8 @@ db: _ensure_env
 		fi; \
 		echo "✅ Import complete!"; \
 	elif [ "$$ACTION" = "export" ]; then \
-		PROJECT_ID=$$(grep '^PROJECT_ID=' .env | cut -d= -f2 | head -1); \
-		PROJECT_NAME=$$(grep '^PROJECT_NAME=' .env | cut -d= -f2 | head -1); \
+		PROJECT_ID=$$(grep '^PROJECT_ID=' .env | cut -d= -f2 | head -1 | tr -d '"'\''\r '); \
+		PROJECT_NAME=$$(grep '^PROJECT_NAME=' .env | cut -d= -f2 | head -1 | tr -d '"'\''\r '); \
 		TIMESTAMP=$$(date +%Y%m%d_%H%M%S); \
 		FILENAME="$${PROJECT_ID}-$${PROJECT_NAME}-$${TIMESTAMP}.sql"; \
 		echo "📤 Exporting database to $$FILENAME..."; \
@@ -232,7 +461,7 @@ db: _ensure_env
 
 .PHONY: ctop
 ctop:
-	@PROJECT_NAME=$$(grep '^PROJECT_NAME=' .env | cut -d= -f2 | head -1); \
+	@PROJECT_NAME=$$(grep '^PROJECT_NAME=' .env | cut -d= -f2 | head -1 | tr -d '"'\''\r '); \
 	docker run --rm -ti \
 		--platform linux/amd64 \
 		--name=ctop \
@@ -243,6 +472,95 @@ ctop:
 php-info:
 	@echo "🔍 Active PHP Configuration (CLI context):"
 	@. ./docker/scripts/set-env-vars.sh && docker compose exec app php -i | grep -E "^(date\.timezone|error_log|error_reporting|display_errors|log_errors|max_input_vars|memory_limit|max_execution_time|opcache\.(enable|validate_timestamps|revalidate_freq)) "
+
+.PHONY: opcache-clear
+opcache-clear: _ensure_env
+	@echo "🧹 Clearing OPcache (PHP-FPM)..."
+	@. ./docker/scripts/set-env-vars.sh && docker compose exec -T app sh -c 'echo "<?php opcache_reset(); echo \"OPcache cleared\n\";" > $${APACHE_DOCUMENT_ROOT:-/var/www/html/public}/opcache_reset_temp.php'
+	@. ./docker/scripts/set-env-vars.sh && docker compose exec -T app curl -s http://localhost:8080/opcache_reset_temp.php || echo "❌ Failed to query OPcache reset script"
+	@. ./docker/scripts/set-env-vars.sh && docker compose exec -T app rm -f $${APACHE_DOCUMENT_ROOT:-/var/www/html/public}/opcache_reset_temp.php
+
+.PHONY: doctor
+doctor: _ensure_env
+	@echo "🩺 Running diagnostic checks..."
+	@echo "─────────────────────────────────"
+	@docker info >/dev/null 2>&1 && echo "✅ Docker daemon is running" || echo "❌ Docker daemon is NOT running or accessible"
+	@if [ -f /sys/kernel/mm/transparent_hugepage/enabled ]; then \
+		THP_STATUS=$$(cat /sys/kernel/mm/transparent_hugepage/enabled | grep -o '\[.*\]' | tr -d '[]'); \
+		echo "ℹ️  Host Transparent Huge Pages: $$THP_STATUS"; \
+		if [ "$$THP_STATUS" = "never" ]; then \
+			echo "   ⚠️  Note: OPcache Huge Code Pages won't work because THP is disabled on the host."; \
+			echo "      (No action needed; OPcache falls back automatically.)"; \
+		fi; \
+	else \
+		echo "ℹ️  Host Transparent Huge Pages: Not supported by OS kernel"; \
+	fi
+	@PROJECT_ID=$$(grep '^PROJECT_ID=' .env | cut -d= -f2 | head -1 | tr -d '"'\''\r '); \
+	DB_PORT="33$$PROJECT_ID"; \
+	SFTP_PORT="22$$PROJECT_ID"; \
+	DB_BIND=$$(grep '^DB_BIND_IP=' .env | cut -d= -f2 | head -1 | tr -d '"'\''\r '); \
+	DB_BIND=$${DB_BIND:-172.17.0.1}; \
+	SFTP_BIND=$$(grep '^SFTP_BIND_IP=' .env | cut -d= -f2 | head -1 | tr -d '"'\''\r '); \
+	SFTP_BIND=$${SFTP_BIND:-127.0.0.1}; \
+	DB_CID=$$(. ./docker/scripts/set-env-vars.sh && docker compose ps -q db 2>/dev/null || true); \
+	SFTP_CID=$$(. ./docker/scripts/set-env-vars.sh && docker compose ps -q sftp 2>/dev/null || true); \
+	DB_OWNED=0; \
+	SFTP_OWNED=0; \
+	if [ -n "$$DB_CID" ] && docker port "$$DB_CID" 2>/dev/null | grep -q ":$$DB_PORT"; then DB_OWNED=1; fi; \
+	if [ -n "$$SFTP_CID" ] && docker port "$$SFTP_CID" 2>/dev/null | grep -q ":$$SFTP_PORT"; then SFTP_OWNED=1; fi; \
+	if command -v ss >/dev/null 2>&1; then \
+		DB_PORT_IN_USE=$$(ss -tln | grep -q ":$$DB_PORT " && echo 1 || echo 0); \
+		SFTP_PORT_IN_USE=$$(ss -tln | grep -q ":$$SFTP_PORT " && echo 1 || echo 0); \
+	elif command -v netstat >/dev/null 2>&1; then \
+		DB_PORT_IN_USE=$$(netstat -tln | grep -q ":$$DB_PORT " && echo 1 || echo 0); \
+		SFTP_PORT_IN_USE=$$(netstat -tln | grep -q ":$$SFTP_PORT " && echo 1 || echo 0); \
+	else \
+		DB_PORT_IN_USE=0; \
+		SFTP_PORT_IN_USE=0; \
+	fi; \
+	if [ "$$DB_BIND" = "0.0.0.0" ]; then \
+		if [ "$$DB_PORT_IN_USE" -eq 1 ]; then \
+			if [ "$$DB_OWNED" -eq 1 ]; then \
+				echo "✅ DB Port $$DB_PORT is OPEN externally (0.0.0.0) and in use by this project (normal)"; \
+			else \
+				echo "⚠️  WARNING: Port $$DB_PORT is configured to be OPEN externally but is occupied by another process/project!"; \
+			fi; \
+		else \
+			echo "✅ DB Port $$DB_PORT is configured to be OPEN externally (0.0.0.0) and is available"; \
+		fi; \
+	else \
+		if [ "$$DB_PORT_IN_USE" -eq 1 ]; then \
+			if [ "$$DB_OWNED" -eq 1 ]; then \
+				echo "🔒 DB Port $$DB_PORT is RESTRICTED to $$DB_BIND in this project (normal)"; \
+			else \
+				echo "⚠️  WARNING: Port $$DB_PORT is restricted to $$DB_BIND but is occupied by another process/project!"; \
+			fi; \
+		else \
+			echo "🔒 DB Port $$DB_PORT is not open externally in this project (restricted to $$DB_BIND)"; \
+		fi; \
+	fi; \
+	if [ "$$SFTP_BIND" = "0.0.0.0" ]; then \
+		if [ "$$SFTP_PORT_IN_USE" -eq 1 ]; then \
+			if [ "$$SFTP_OWNED" -eq 1 ]; then \
+				echo "✅ SFTP Port $$SFTP_PORT is OPEN externally (0.0.0.0) and in use by this project (normal)"; \
+			else \
+				echo "⚠️  WARNING: Port $$SFTP_PORT is configured to be OPEN externally but is occupied by another process/project!"; \
+			fi; \
+		else \
+			echo "✅ SFTP Port $$SFTP_PORT is configured to be OPEN externally (0.0.0.0) and is available"; \
+		fi; \
+	else \
+		if [ "$$SFTP_PORT_IN_USE" -eq 1 ]; then \
+			if [ "$$SFTP_OWNED" -eq 1 ]; then \
+				echo "🔒 SFTP Port $$SFTP_PORT is RESTRICTED to localhost (127.0.0.1) in this project (normal)"; \
+			else \
+				echo "⚠️  WARNING: Port $$SFTP_PORT is restricted to localhost but is occupied by another process/project!"; \
+			fi; \
+		else \
+			echo "🔒 SFTP Port $$SFTP_PORT is not open externally in this project (restricted to localhost)"; \
+		fi; \
+	fi
+	@echo "─────────────────────────────────"
 
 .PHONY: open-ports
 open-ports: _ensure_env
@@ -298,21 +616,34 @@ redis-ping:
 # --- Security Management ---
 .PHONY: secure
 secure: _ensure_env
-	@USER_ID=$$(grep '^USER_ID=' .env | cut -d= -f2 | head -1); \
-	GROUP_ID=$$(grep '^GROUP_ID=' .env | cut -d= -f2 | head -1); \
+	@USER_ID=$$(grep '^USER_ID=' .env | cut -d= -f2 | head -1 | tr -d '"'\''\r '); \
+	GROUP_ID=$$(grep '^GROUP_ID=' .env | cut -d= -f2 | head -1 | tr -d '"'\''\r '); \
 	./docker/scripts/secure-wp.sh lock "$$USER_ID:$$GROUP_ID"
 
 .PHONY: insecure
 insecure: _ensure_env
-	@USER_ID=$$(grep '^USER_ID=' .env | cut -d= -f2 | head -1); \
-	GROUP_ID=$$(grep '^GROUP_ID=' .env | cut -d= -f2 | head -1); \
+	@USER_ID=$$(grep '^USER_ID=' .env | cut -d= -f2 | head -1 | tr -d '"'\''\r '); \
+	GROUP_ID=$$(grep '^GROUP_ID=' .env | cut -d= -f2 | head -1 | tr -d '"'\''\r '); \
 	./docker/scripts/secure-wp.sh unlock "$$USER_ID:$$GROUP_ID"
 
 .PHONY: fix-permissions
 fix-permissions: _ensure_env
-	@USER_ID=$$(grep '^USER_ID=' .env | cut -d= -f2 | head -1); \
-	GROUP_ID=$$(grep '^GROUP_ID=' .env | cut -d= -f2 | head -1); \
+	@USER_ID=$$(grep '^USER_ID=' .env | cut -d= -f2 | head -1 | tr -d '"'\''\r '); \
+	GROUP_ID=$$(grep '^GROUP_ID=' .env | cut -d= -f2 | head -1 | tr -d '"'\''\r '); \
 	./docker/scripts/secure-wp.sh fix "$$USER_ID:$$GROUP_ID"
+
+# --- Versioning & Updates ---
+.PHONY: release
+release:
+	@./docker/scripts/release.sh
+
+.PHONY: update
+update:
+	@./docker/scripts/update.sh $(version)
+
+.PHONY: rollback
+rollback:
+	@./docker/scripts/rollback.sh
 
 # --- Sizing Profiles ---
 # Helper function to update a variable in .env (works on both macOS and Linux)
@@ -409,8 +740,19 @@ size-large: _ensure_env
 
 .PHONY: size-show
 size-show: _ensure_env
-	@echo "📊 Current sizing configuration:"
-	@echo "─────────────────────────────────"
+	@APP_MEM=$$(grep '^APP_MEMORY=' .env | cut -d= -f2 | tr -d '"'\''\r '); \
+	DB_MEM=$$(grep '^DB_MEMORY=' .env | cut -d= -f2 | tr -d '"'\''\r '); \
+	FPM_CHILDREN=$$(grep '^PHP_FPM_PM_MAX_CHILDREN=' .env | cut -d= -f2 | tr -d '"'\''\r '); \
+	PROFILE="⚠️  CUSTOM (modified)"; \
+	if [ "$$APP_MEM" = "256M" ] && [ "$$DB_MEM" = "512M" ] && [ "$$FPM_CHILDREN" = "10" ]; then \
+		PROFILE="🟢 SMALL (Low traffic)"; \
+	elif [ "$$APP_MEM" = "512M" ] && [ "$$DB_MEM" = "1G" ] && [ "$$FPM_CHILDREN" = "25" ]; then \
+		PROFILE="🟡 MEDIUM (Medium traffic)"; \
+	elif [ "$$APP_MEM" = "1G" ] && [ "$$DB_MEM" = "2G" ] && [ "$$FPM_CHILDREN" = "50" ]; then \
+		PROFILE="🔴 LARGE (High traffic)"; \
+	fi; \
+	echo "📊 Current sizing configuration (Profile: $$PROFILE):"; \
+	echo "─────────────────────────────────"
 	@echo "  App:   CPU=$$(grep '^APP_CPUS=' .env | cut -d= -f2)  MEM=$$(grep '^APP_MEMORY=' .env | cut -d= -f2)  Tmpfs=$$(grep '^APP_TMPFS_SIZE=' .env | cut -d= -f2)"
 	@echo "  Cron:  CPU=$$(grep '^CRON_CPUS=' .env | cut -d= -f2)  MEM=$$(grep '^CRON_MEMORY=' .env | cut -d= -f2)  Tmpfs=$$(grep '^CRON_TMPFS_SIZE=' .env | cut -d= -f2)"
 	@echo "  DB:    CPU=$$(grep '^DB_CPUS=' .env | cut -d= -f2)  MEM=$$(grep '^DB_MEMORY=' .env | cut -d= -f2)  BufferPool=$$(grep '^DB_INNODB_BUFFER_POOL_SIZE=' .env | cut -d= -f2)  LogFile=$$(grep '^DB_INNODB_LOG_FILE_SIZE=' .env | cut -d= -f2)  MaxConn=$$(grep '^DB_MAX_CONNECTIONS=' .env | cut -d= -f2)"
@@ -431,3 +773,5 @@ crontab-init:
 # Catch-all target for positional arguments
 %:
 	@:
+
+endif
