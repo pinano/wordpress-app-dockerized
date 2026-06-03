@@ -1,16 +1,40 @@
-# Dockerized WordPress Application
+<p align="center">
+  <img src="docs/badge.png" alt="Dockerized WordPress App Logo" width="220" />
+</p>
 
-A modernized Docker stack for running WordPress applications, featuring optimized performance, secure defaults, and easy management via `make`.
+<h1 align="center">Dockerized WordPress Application</h1>
+
+<p align="center">
+  <strong>🚀 Modernizing WordPress Delivery: A performance-tuned, secure-by-default Docker orchestration with integrated Telegram Bot publishing.</strong>
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge" alt="License: MIT" /></a>
+  <img src="https://img.shields.io/badge/WordPress-21759B?style=for-the-badge&logo=wordpress&logoColor=white" alt="WordPress" />
+  <img src="https://img.shields.io/badge/PHP-8.1%20|%208.3%20|%208.5-777BB4?style=for-the-badge&logo=php&logoColor=white" alt="PHP Versions" />
+  <img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker" />
+  <img src="https://img.shields.io/badge/MariaDB-003545?style=for-the-badge&logo=mariadb&logoColor=white" alt="MariaDB" />
+  <img src="https://img.shields.io/badge/Valkey%20/%20Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white" alt="Valkey/Redis" />
+  <img src="https://img.shields.io/badge/Telegram%20Bot-26A69A?style=for-the-badge&logo=telegram&logoColor=white" alt="Telegram Bot" />
+  <img src="https://img.shields.io/badge/GNU%20Make-000000?style=for-the-badge&logo=gnu&logoColor=white" alt="GNU Make" />
+</p>
+
+A modernized Docker stack for running WordPress applications, featuring optimized performance, secure defaults, an interactive Telegram publishing interface, and easy management via `make`.
+
+---
 
 ## Features
 - **Configurable PHP Version**: Switch between PHP versions (e.g., 8.1, 8.3, 8.5) via `.env`.
-- **MariaDB 12**: Latest stable database version.
-- **Performance Tuned**: Optimized `opcache` and `realpath_cache` settings for WordPress.
-- **Tmpfs Integration**: High-performance, ephemeral storage for WordPress cache/sessions.
-- **Secure by Default**: DB port restricted to localhost.
+- **MariaDB 12**: Latest stable database version with resource limitations and performance tuning.
+- **Performance Tuned**: Optimized `opcache` and `realpath_cache` settings specifically for WordPress.
+- **Tmpfs Integration**: High-performance, ephemeral storage for WordPress sessions and temp caches.
+- **Secure by Default**: SFTP restricted to localhost, DB restricted to Docker bridge IP, and read-only WP core file locking.
 - **Traefik Ready**: Integrated labels for Traefik reverse proxy.
-- **Advanced Flexibility**: Built-in support for Redis, Xdebug, Cronjobs, and custom PHP overrides.
-- **Unified Management**: Simple `Makefile` for all common operations.
+- **Telegram Bot Interface**: Publishing posts directly from your mobile phone without using the REST API (executes commands via `wp-cli`).
+- **Advanced Flexibility**: Built-in support for Redis/Valkey object cache, Xdebug, Cronjobs, and custom PHP/Apache overrides.
+- **Unified Management**: Comprehensive, colorized `Makefile` with detailed target-specific help and environment diagnostics.
+
+---
 
 ## Quickstart
 
@@ -18,7 +42,7 @@ A modernized Docker stack for running WordPress applications, featuring optimize
     ```bash
     make start
     ```
-    This will automatically copy `.env.dist` to `.env` if it doesn't exist and start the containers.
+    This will automatically copy `.env.dist` to `.env` if it doesn't exist, sync missing variables, and start the containers.
 
 2.  **Access the Application**
     The application is configured to run behind Traefik (a reverse proxy).
@@ -33,7 +57,7 @@ A modernized Docker stack for running WordPress applications, featuring optimize
     3. Access the app via: `http://127.0.0.1:8080`.
 
 3.  **Database Access**
-    Connect specifically to the MariaDB console:
+    Connect to the MariaDB console using regular user credentials:
     ```bash
     make db
     ```
@@ -43,108 +67,83 @@ A modernized Docker stack for running WordPress applications, featuring optimize
     make db import <file.sql>
     ```
 
+---
+
 ## Configuration
 
 Configuration is managed via the `.env` file. Key variables include:
 
 - `PROJECT_NAME`: Used for container naming and network isolation.
-- `APP_ENV`: Application environment (`production` or `development`; defaults to `development`). **[Read the APP_ENV Guide here](docs/app_env.md).**
-- `PHP_VERSION`: The PHP version tag for `serversideup/php` (e.g., `8.1`, `8.5`).
+- `APP_ENV`: Application environment (`production` or `development`). **[Read the APP_ENV Guide here](docs/app_env.md).**
+- `PHP_VERSION`: The PHP version tag for `serversideup/php` (e.g., `8.5`).
 - `APACHE_DOCUMENT_ROOT`: Path to the public web root (default: `/var/www/html/public`).
-- `DB_*`: Database credentials and settings.
+- `DB_*`: Database credentials, table prefix, and bind IP settings.
+- `SFTP_*`: SFTP user credentials.
+- `COMPOSE_PROFILES`: Comma-separated list of services to enable (e.g. `db,cron,redis,sftp,wpcli`).
 
-### Scalability and Performance Tuning
+### Scalability and Capacity Profiles
 
-The stack is designed to scale from small low-traffic sites to large applications. You can adjust the allocated resources and caching parameters in your `.env` file:
+The stack is designed to scale from low-traffic dev environments to large applications. You can apply pre-defined sizing parameters directly:
 
-- **App Resources**: Limit CPU (`APP_CPUS`) and memory (`APP_MEMORY`) for the PHP container.
-- **PHP Performance**: Configure OPcache (`PHP_OPCACHE_MEMORY_CONSUMPTION`, `PHP_OPCACHE_MAX_ACCELERATED_FILES`), input vars (`PHP_MAX_INPUT_VARS`), and FPM pool tuning (`PHP_FPM_PM_MAX_CHILDREN`, `PHP_FPM_PM_MAX_REQUESTS`) for faster and more stable execution.
-- **Database Resources**: Assign CPU and memory limits to MariaDB (`DB_CPUS`, `DB_MEMORY`).
-- **Database Tuning**: For high traffic, increase `DB_MAX_CONNECTIONS` and `DB_INNODB_BUFFER_POOL_SIZE` (crucial for InnoDB performance).
-- **Cron Resources**: Configure memory and tmpfs for the cron container (`CRON_CPUS`, `CRON_MEMORY`, `CRON_TMPFS_SIZE`).    
+- `make size-small`: Allocates low RAM and CPU. Ideal for local dev or low-memory servers (< 500 visits/day).
+- `make size-medium`: Balanced resources (500 - 5000 visits/day).
+- `make size-large`: High-performance setup (> 5000 visits/day). Allocates higher DB buffer pools and PHP worker processes.
 
-For detailed sizing profiles (Small/Medium/Large) and capacity planning, see the **[Sizing Guide](docs/sizing.md)**.
+For details, see the **[Sizing Guide](docs/sizing.md)**.
 
-### Advanced Stack Control
+---
 
-You can enable additional stack features for specific WordPress applications via `.env` or configuration files:
+## Security & Hardening (Permissions)
 
-- **Optional Redis Cache**: Add `COMPOSE_PROFILES=redis` to your `.env` to automatically start a lightweight Redis container (powered by Valkey). **[Read the Full Redis Integration Guide here](docs/redis.md).**
-- **Xdebug for Local Dev**: Set `PHP_EXTENSION_XDEBUG=1` in your `.env`. Keep it disabled in production.
-- **Cronjobs**: Schedule application tasks without connecting to the container by adding cron syntax to `docker/scripts/crontab`. A dedicated CLI container executes them automatically. **[Read the Cronjobs Guide here](docs/cron.md).**
-- **Local PHP Overrides**: If a specific project needs an unusual PHP setting (e.g., `max_input_vars = 5000`), simply add it to `docker/php/custom.ini` without modifying the core image.
-- **Verbose Logging**: Adjust `APACHE_LOG_LEVEL=debug` (or `warn` by default) in your `.env` to troubleshoot complex HTTP errors.
-- **Application Error Logs**: WordPress errors are caught and invisible in Docker logs by default. See **[Logging Guide](docs/logging.md)** for the required fix and best practices.
+To prevent core file hijacking (e.g., malware modifying WordPress core assets), this stack features a built-in hardening command system:
 
-## Project Structure
+- **Locked (Safe default)**: Run `make secure` to make all core WordPress files Read-Only for the web server. Folders like `uploads`, `cache`, and `languages` remain writable for standard operation.
+- **Unlocked (Maintenance)**: Run `make insecure` when you need to upgrade WordPress or install/update plugins from the administrator dashboard.
+- **Permissions Repair**: If permission issues arise after manual file uploads, use `make fix-permissions` to restore the standard UID/GID and permission levels.
 
-```
-.
-├── docker/            # Docker configuration files (Apache, PHP, Scripts)
-│   └── scripts/        
-│       └── init-app.sh # Bootstrapper: PHP error forwarder, healthcheck.php, cron env injection
-├── docs/               # Guides (APP_ENV, Cron, Redis, Sizing, Logging, Storage)
-├── docroot/            # WordPress source code (public/ contains WP core)
-├── mariadb_data/       # Persistent database storage
-├── .env                # Environment variables
-├── docker-compose.yml  # Container orchestration config
-├── wp-cli.yml          # WP-CLI configuration
-└── Makefile            # Command task runner
-```
+*Always keep the site in **secure** mode during normal operation.*
+
+---
 
 ## Management Commands
 
 | Command | Description |
 |---------|-------------|
-| `make help` | Show all available commands |
-| `make init` | Initialize environment (.env) |
-| `make start` | Start the stack (creates/validates .env) |
+| `make help` | Show general colorized help menu |
+| `make <target> help` | Show target-specific detailed explanation |
+| `make doctor` | Run diagnostic checks (ports conflict, host Transparent Huge Pages status) |
+| `make start` | Start the stack (initializes, syncs, and validates `.env` if missing) |
 | `make stop` | Stop the stack and cleanup orphans |
-| `make restart` | Restart all containers |
-| `make rebuild <svr>` | Rebuild all or specific service |
+| `make restart` | Perform clean restart (equivalent to stop + start) |
+| `make rebuild <service>` | Rebuild Docker images for the stack (e.g. `make rebuild app`) |
 | `make status` | Show stack status (`docker compose ps`) |
-| `make services` | List available services |
-| `make validate` | Validate `.env` against minimum requirements |
-| `make sync` | Synchronize `.env` with `.env.dist` (Add missing keys) |
-| `make logs [svr\|wordpress]` | Container logs (all or specific service) or WordPress app log (`wordpress`) |
-| `make shell <svr>` | Access container shell (defaults to `app`) |
-| `make pull` | Pull latest images |
-| `make clean` | Clean configs and volumes (requires confirmation) |
-| `make db` | MariaDB console, or use `import`/`export` |
-| `make config` | Validate Docker Compose config |
-| `make php-info` | Show active PHP configuration in the container |
-| `make ctop` | Monitor containers using ctop |
-| `make open-ports` | Expose DB & SFTP ports externally (0.0.0.0) |
-| `make close-ports` | Restrict DB & SFTP ports (DB to 172.17.0.1, SFTP to 127.0.0.1) |
-| `make open-db` / `close-db` | Expose or restrict only the DB |
-| `make redis-info` | Show Redis server statistics |
-| `make redis-monitor`| Monitor Redis commands in real-time |
-| `make redis-ping`   | Ping Redis server |
-| `make crontab-init` | Create example crontab file |
-| `make size-small` | Apply Small sizing profile |
-| `make size-medium` | Apply Medium sizing profile |
-| `make size-large` | Apply Large sizing profile |
-| `make size-show` | Show current sizing config |
-| `make secure` | Lock site core (Set files to 444/Read-Only) |
-| `make insecure` | Unlock site core (Set files to 644/Write access) |
-| `make fix-permissions` | Fix ownership and base permissions (644/755) |
+| `make logs [service]` | Follow logs for all containers or a specific service (e.g. `make logs bot`) |
+| `make logs wordpress` | Tail WordPress application debug log directly |
+| `make shell [service]` | Open terminal inside container (defaults to `app`) |
+| `make db` | Access MariaDB console as regular user |
+| `make db-root` | Access database console as `root` user |
+| `make db import <file>` | Import a SQL file into the database (supports `pv` progress bar) |
+| `make db export` | Export a timestamped SQL snapshot from the database |
+| `make opcache-clear` | Clear OPcache bytecode cache for the PHP pool (zero-downtime flush) |
+| `make php-info` | Display active PHP configuration settings in the running container |
+| `make ctop` | Monitor project containers in real-time using ctop |
+| `make open-ports` / `close-ports` | Open/close DB and SFTP ports externally (0.0.0.0 vs restricted) |
+| `make release` | Generate a new CalVer release, update CHANGELOG.md, and create a git tag |
+| `make update [version=X]` | Checkout and upgrade codebase to a specific version or latest tag |
+| `make rollback` | Interactively select and roll back codebase to a prior tag |
+| `make size-small` / `medium` / `large` | Apply sizing resource profiles |
+| `make size-show` | Show active sizing resource allocations |
+| `make secure` / `insecure` | Lock (Read-only) / Unlock (Writable) WordPress core files |
+| `make fix-permissions` | Restore standard file ownership and permissions |
+
+---
 
 ## Services
 
 - **app**: PHP-FPM + Apache (serversideup/php image).
 - **bot** (Optional): Telegram bot for remote blogging (Python + FFmpeg).
-- **cron**: CLI container to run scheduled tasks.
+- **cron**: CLI container to run scheduled WordPress cron tasks.
 - **db**: MariaDB 12.1.2.
 - **redis** (Optional): In-memory cache store (Powered by Valkey).
 - **sftp** (Optional): SFTP server for file access.
-- **wpcli** (On-demand): WordPress CLI tools. Run via `docker compose run --rm wpcli ...`.
-
-## Security & Permissions (Hardening)
-
-To prevent core file hijacking (e.g., unauthorized modifications to `index.php`), this stack features a built-in hardening system:
-
-- **Locked (Default/Safe)**: Use `make secure` to make all WordPress core files Read-Only for the web server. This prevents many common exploits from modifying your site. Key folders like `uploads`, `cache`, and `languages` remain writable for standard operation.
-- **Unlocked (Maintenance)**: Use `make insecure` when you need to update WordPress or install/update plugins from the admin dashboard.
-- **Repair**: If you ever experience weird permission issues after manual file uploads, use `make fix-permissions` to restore the standard UID/GID and permission levels.
-
-*It is highly recommended to keep the site in **secure** mode during normal operation.*
+- **wpcli** (On-demand): WordPress CLI tools.
