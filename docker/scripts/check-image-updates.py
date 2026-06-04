@@ -10,9 +10,9 @@ import json
 try:
     import yaml
 except ImportError:
-    script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     for venv in ['.venv', 'venv']:
-        venv_python = os.path.join(script_dir, venv, 'bin', 'python3')
+        venv_python = os.path.join(project_root, venv, 'bin', 'python3')
         if os.path.exists(venv_python):
             if venv_python != sys.executable:
                 os.execv(venv_python, [venv_python] + sys.argv)

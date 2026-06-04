@@ -11,6 +11,15 @@ PROJECT_ID     := $(if $(PROJECT_ID_RAW),$(PROJECT_ID_RAW),999)
 DB_PORT        := 33$(PROJECT_ID)
 SFTP_PORT      := 22$(PROJECT_ID)
 
+# Define Python interpreter (prioritizes virtual environment)
+ifneq (,$(wildcard .venv/bin/python3))
+    PYTHON := .venv/bin/python3
+else ifneq (,$(wildcard venv/bin/python3))
+    PYTHON := venv/bin/python3
+else
+    PYTHON := python3
+endif
+
 # Detect if 'help' is one of the goals, and there is at least one other goal.
 # E.g., 'make start help' or 'make help start'.
 SHOW_HELP :=
@@ -306,6 +315,21 @@ init:
 	else \
 		echo "ℹ️  .env already exists."; \
 	fi
+	@$(MAKE) --no-print-directory venv
+
+.PHONY: venv
+venv:
+	@if [ ! -d .venv ]; then \
+		echo "📦 Creating virtual environment (.venv)..."; \
+		python3 -m venv .venv 2>/dev/null || \
+		(echo "❌ Error: Failed to create virtual environment."; \
+		 echo "👉 Please install python3-venv (e.g. 'sudo apt install python3-venv' or similar)."; \
+		 exit 1); \
+	fi
+	@echo "⬇️  Installing/Updating Python dependencies..."
+	@.venv/bin/pip install -q pyyaml || \
+	(echo "⚠️  Warning: Failed to install pyyaml. Check your internet connection."; exit 1)
+	@echo "✅ Python environment ready."
 
 .PHONY: start
 start:
@@ -370,7 +394,7 @@ services:
 sync:
 	@echo "🔄 Synchronizing .env with .env.dist..."
 	@command -v python3 >/dev/null 2>&1 || (echo "❌ python3 is required for 'make sync'. Install it with: apt install python3 / brew install python3"; exit 1)
-	@python3 docker/scripts/sync-env.py
+	@$(PYTHON) docker/scripts/sync-env.py
 
 .PHONY: logs
 logs:
@@ -654,7 +678,7 @@ rollback:
 
 .PHONY: check-updates
 check-updates:
-	@python3 ./docker/scripts/check-image-updates.py
+	@$(PYTHON) ./docker/scripts/check-image-updates.py
 
 # --- Sizing Profiles ---
 # Helper function to update a variable in .env (works on both macOS and Linux)
