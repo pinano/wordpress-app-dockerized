@@ -1,3 +1,8 @@
+## v2026.06.04 (2026-06-04)
+
+- feat: enhance check-image-updates script to resolve Dockerfile FROM variables and support filtering via Docker Hub API (e8cf763)
+- feat: introduce automated virtual environment management and centralized Python interpreter selection in Makefile (f2a2115)
+
 ## v2026.06.03.5 (2026-06-03)
 
 - fix: suppress grep errors and handle missing PROJECT_ID in database export filename generation (4273e5a)
