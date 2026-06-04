@@ -243,7 +243,7 @@ services:
 
   # --- SFTP ---
   sftp:
-    image: lscr.io/linuxserver/openssh-server:latest
+    image: lscr.io/linuxserver/openssh-server:10.2_p1-r0-ls226
     container_name: ${PROJECT_NAME}-sftp
     profiles: [ "sftp" ]
     deploy:
@@ -299,7 +299,7 @@ services:
   # Run like this:
   # docker compose run --rm wpcli -d memory_limit=512M /usr/local/bin/wp <comando>
   wpcli:
-    image: wordpress:cli
+    image: wordpress:cli-2.12.0-php${PHP_VERSION:-8.5}
     container_name: ${PROJECT_NAME}-wpcli
     profiles: [ "wpcli" ]
     user: ${USER_ID:-1000}:${GROUP_ID:-1000}

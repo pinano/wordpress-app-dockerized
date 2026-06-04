@@ -1,7 +1,7 @@
 # Telegram Bot container
 # Python-based, uses python-telegram-bot (long-polling) + ffmpeg for media processing
 
-FROM python:3.13-slim
+FROM python:3.14.5-slim
 
 # Install system dependencies: ffmpeg for media processing, curl for healthcheck/downloads
 RUN apt-get update \
