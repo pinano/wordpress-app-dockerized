@@ -8,6 +8,7 @@ import argparse
 import json
 import logging
 import os
+import subprocess
 import sys
 import time
 import urllib.request
@@ -87,46 +88,73 @@ def get_untagged_post_ids() -> list[int]:
         return []
 
 
-def get_post_media_path(post_id: int) -> Optional[str]:
+def get_post_media_info(post_id: int) -> list[dict]:
     """
-    Find the primary media attachment for a post and return its relative uploads path.
-    Checks featured image first, then the first attached file.
+    Get all media attachments and the featured image for a post using a single wp eval call.
+    Returns a list of dicts: [{'id': int, 'mime': str, 'file': str, 'is_thumbnail': bool}]
     """
-    # 1. Try featured image
+    php_code = (
+        f"$res = array();"
+        f"$thumb_id = get_post_meta({post_id}, '_thumbnail_id', true);"
+        f"if ($thumb_id) {{"
+        f"  $t = get_post($thumb_id);"
+        f"  if ($t) {{"
+        f"    $res[] = array("
+        f"      'id' => (int)$t->ID,"
+        f"      'mime' => $t->post_mime_type,"
+        f"      'file' => get_post_meta($t->ID, '_wp_attached_file', true),"
+        f"      'is_thumbnail' => true"
+        f"    );"
+        f"  }}"
+        f"}}"
+        f"$attachments = get_posts(array("
+        f"  'post_parent' => {post_id},"
+        f"  'post_type' => 'attachment',"
+        f"  'posts_per_page' => -1"
+        f"));"
+        f"foreach ($attachments as $a) {{"
+        f"  $found = false;"
+        f"  foreach ($res as $r) {{"
+        f"    if ($r['id'] == $a->ID) {{ $found = true; break; }}"
+        f"  }}"
+        f"  if (!$found) {{"
+        f"    $res[] = array("
+        f"      'id' => (int)$a->ID,"
+        f"      'mime' => $a->post_mime_type,"
+        f"      'file' => get_post_meta($a->ID, '_wp_attached_file', true),"
+        f"      'is_thumbnail' => false"
+        f"    );"
+        f"  }}"
+        f"}}"
+        f"echo json_encode($res);"
+    )
     try:
-        thumb_id_str = wp_cli.run("post", "meta", "get", str(post_id), "_thumbnail_id")
-        if thumb_id_str and thumb_id_str.strip().isdigit():
-            media_id = int(thumb_id_str.strip())
-            attached = wp_cli.run("post", "meta", "get", str(media_id), "_wp_attached_file")
-            if attached and attached.strip():
-                return attached.strip()
-    except Exception:
-        pass
-
-    # 2. Try first attachment
-    try:
-        attachments_json = wp_cli.run(
-            "post", "list",
-            f"--post_parent={post_id}",
-            "--post_type=attachment",
-            "--format=json",
-            "--fields=ID",
-            "--posts_per_page=1",
-        )
-        if attachments_json:
-            attachments = json.loads(attachments_json)
-            if attachments:
-                media_id = int(attachments[0]["ID"])
-                attached = wp_cli.run("post", "meta", "get", str(media_id), "_wp_attached_file")
-                if attached and attached.strip():
-                    return attached.strip()
+        raw = wp_cli.run("eval", php_code)
+        if not raw or not raw.strip():
+            return []
+        return json.loads(raw.strip())
     except Exception as exc:
-        logger.warning("Failed to find attachment for post %s: %s", post_id, exc)
+        logger.error("Failed to get post media info: %s", exc)
+        return []
 
-    return None
+
+def get_post_text_info(post_id: int) -> tuple[str, str]:
+    """Get the post title and excerpt/content to fall back on or enrich tagging."""
+    try:
+        title = wp_cli.run("post", "get", str(post_id), "--field=post_title").strip()
+        excerpt = wp_cli.run("post", "get", str(post_id), "--field=post_excerpt").strip()
+        if not excerpt:
+            excerpt = wp_cli.run("post", "get", str(post_id), "--field=post_content").strip()
+            # strip html tags if any
+            import re
+            excerpt = re.sub('<[^<]+?>', '', excerpt).strip()
+        return title, excerpt
+    except Exception as exc:
+        logger.warning("Failed to get post text info: %s", exc)
+        return "", ""
 
 
-def download_media_to_temp(relative_path: str, post_id: int) -> Optional[str]:
+def download_media_to_temp(relative_path: str, post_id: int, item_id: Optional[int] = None) -> Optional[str]:
     """
     Download a media file from WordPress uploads to a local temp path.
     Returns the absolute temp file path, or None on failure.
@@ -135,7 +163,8 @@ def download_media_to_temp(relative_path: str, post_id: int) -> Optional[str]:
         # Build internal HTTP URL (bot → app container, port 8080)
         url = f"http://{config.WP_CONTAINER}:8080/wp-content/uploads/{relative_path}"
         ext = Path(relative_path).suffix
-        temp_path = os.path.join(config.DOWNLOAD_PATH, f"tagger_temp_{post_id}{ext}")
+        suffix = f"_{item_id}" if item_id else ""
+        temp_path = os.path.join(config.DOWNLOAD_PATH, f"tagger_temp_{post_id}{suffix}{ext}")
         os.makedirs(config.DOWNLOAD_PATH, exist_ok=True)
         logger.info("Downloading media for post %s: %s", post_id, url)
         urllib.request.urlretrieve(url, temp_path)
@@ -168,6 +197,7 @@ def _build_prompt() -> str:
 
 _IMAGE_MIME_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"}
 _VIDEO_MIME_TYPES = {"video/mp4", "video/mov", "video/mpeg", "video/webm", "video/quicktime"}
+_AUDIO_MIME_TYPES = {"audio/mpeg", "audio/mp3", "audio/wav", "audio/ogg", "audio/mp4", "audio/x-m4a"}
 
 def _detect_mime_type(local_file_path: str) -> str:
     """Detect MIME type from file extension."""
@@ -178,16 +208,15 @@ def _detect_mime_type(local_file_path: str) -> str:
         ".gif": "image/gif",
         ".mp4": "video/mp4", ".mov": "video/quicktime",
         ".mpeg": "video/mpeg", ".webm": "video/webm",
+        ".mp3": "audio/mpeg", ".wav": "audio/wav",
+        ".ogg": "audio/ogg", ".m4a": "audio/mp4",
     }
     return mapping.get(ext, "application/octet-stream")
 
 
-def get_tags_from_gemini(local_file_path: str) -> list[str]:
+def get_tags_from_gemini(local_file_paths: list[str], post_title: str = "", post_excerpt: str = "") -> list[str]:
     """
-    Analyze a local media file with Gemini and return suggested tags.
-
-    For images: sends inline bytes (uses stable v1 API, no Files API needed).
-    For videos: uses the Files API (required for large files).
+    Analyze media files and/or text with Gemini and return suggested tags.
     """
     from google import genai
     from google.genai import types
@@ -196,45 +225,56 @@ def get_tags_from_gemini(local_file_path: str) -> list[str]:
     if not client:
         return []
 
-    model_name = config.GEMINI_MODEL or "gemini-2.0-flash"
-    mime_type = _detect_mime_type(local_file_path)
-
-    logger.info("Analyzing %s (%s) with model %s...", local_file_path, mime_type, model_name)
-
-    is_image = mime_type in _IMAGE_MIME_TYPES
-    is_video = mime_type in _VIDEO_MIME_TYPES
-
-    if not is_image and not is_video:
-        logger.warning("Unsupported MIME type %s, skipping.", mime_type)
-        return []
-
-    uploaded_file = None
+    model_name = config.GEMINI_MODEL or "gemini-2.5-flash"
+    parts = []
+    uploaded_files = []
 
     try:
-        if is_image:
-            # ── Images: send inline as bytes (no Files API, uses v1 stable) ──
-            with open(local_file_path, "rb") as f:
-                image_bytes = f.read()
-            media_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
-        else:
-            # ── Videos: upload via Files API (required for large files) ──
-            logger.info("Uploading video to Gemini Files API...")
-            uploaded_file = client.files.upload(file=local_file_path)
-            logger.info("Upload complete. Name: %s", uploaded_file.name)
+        for path in local_file_paths:
+            mime_type = _detect_mime_type(path)
+            is_image = mime_type in _IMAGE_MIME_TYPES
+            is_audio = mime_type in _AUDIO_MIME_TYPES
+            is_video = mime_type in _VIDEO_MIME_TYPES
 
-            # Wait for processing
-            while uploaded_file.state.name == "PROCESSING":
-                time.sleep(2)
-                uploaded_file = client.files.get(name=uploaded_file.name)
-            if uploaded_file.state.name == "FAILED":
-                logger.error("Gemini failed to process video.")
-                return []
+            if is_image:
+                logger.info("Adding image %s (%s) to Gemini request...", path, mime_type)
+                with open(path, "rb") as f:
+                    image_bytes = f.read()
+                parts.append(types.Part.from_bytes(data=image_bytes, mime_type=mime_type))
+            elif is_audio:
+                logger.info("Adding audio %s (%s) to Gemini request...", path, mime_type)
+                with open(path, "rb") as f:
+                    audio_bytes = f.read()
+                parts.append(types.Part.from_bytes(data=audio_bytes, mime_type=mime_type))
+            elif is_video:
+                logger.info("Uploading video %s (%s) to Gemini Files API...", path, mime_type)
+                uploaded_file = client.files.upload(file=path)
+                uploaded_files.append(uploaded_file)
 
-            media_part = types.Part.from_uri(
-                file_uri=uploaded_file.uri, mime_type=uploaded_file.mime_type
+                # Wait for processing
+                while uploaded_file.state.name == "PROCESSING":
+                    time.sleep(2)
+                    uploaded_file = client.files.get(name=uploaded_file.name)
+                if uploaded_file.state.name == "FAILED":
+                    logger.error("Gemini failed to process video.")
+                    continue
+
+                parts.append(types.Part.from_uri(
+                    file_uri=uploaded_file.uri, mime_type=uploaded_file.mime_type
+                ))
+
+        # Build prompt
+        prompt = _build_prompt()
+        if not local_file_paths and (post_title or post_excerpt):
+            prompt = (
+                f"Analiza el siguiente título y descripción de un post de blog y sugiere etiquetas descriptivas.\n"
+                f"Título: {post_title}\n"
+                f"Descripción: {post_excerpt}\n\n"
+                f"{prompt}"
             )
+            logger.info("No supported media files found. Falling back to text-based tagging...")
 
-        contents = [media_part, _build_prompt()]
+        contents = parts + [prompt]
 
         # Retry with backoff on 429 (rate limit) and 503 (overload)
         max_retries = 4
@@ -251,7 +291,7 @@ def get_tags_from_gemini(local_file_path: str) -> list[str]:
                 if is_rate_limit or is_overload:
                     retry_delay = 15 if is_overload else 60
                     import re
-                    match = re.search(r"retryDelay['\"]:\s*['\"](\\d+)", exc_str)
+                    match = re.search(r"retryDelay['\"]:\s*['\"](\d+)", exc_str)
                     if match:
                         retry_delay = int(match.group(1)) + 2
                     if attempt < max_retries - 1:
@@ -272,35 +312,85 @@ def get_tags_from_gemini(local_file_path: str) -> list[str]:
         logger.error("Gemini API error: %s", exc)
         return []
     finally:
-        if uploaded_file:
+        for f in uploaded_files:
             try:
-                client.files.delete(name=uploaded_file.name)
-                logger.info("Deleted remote video file from Gemini.")
+                client.files.delete(name=f.name)
+                logger.info("Deleted remote video file %s from Gemini.", f.name)
             except Exception as exc:
-                logger.warning("Failed to delete remote file: %s", exc)
+                logger.warning("Failed to delete remote file %s: %s", f.name, exc)
 
 
 # ── Core logic ────────────────────────────────────────────────────────────────
 
 def tag_single_post(post_id: int, dry_run: bool = False) -> list[str]:
     """
-    Analyze the primary media for a post, get AI tags, and assign them.
+    Analyze the media (images, audio, video thumbnails) or text content for a post,
+    get AI tags from Gemini, and assign them.
     Returns the list of tags (whether or not dry_run is active).
     """
     logger.info("=== Processing Post ID %s ===", post_id)
 
-    media_path = get_post_media_path(post_id)
-    if not media_path:
-        logger.warning("No media found for post %s. Skipping.", post_id)
-        return []
+    # 1. Fetch text info for fallback or additional context
+    post_title, post_excerpt = get_post_text_info(post_id)
 
-    temp_file = download_media_to_temp(media_path, post_id)
-    if not temp_file:
-        return []
+    # 2. Fetch all media attachments for the post
+    media_items = get_post_media_info(post_id)
 
-    tags = []
+    # 3. Filter generic placeholder thumbnails (306/307)
+    valid_items = [item for item in media_items if item['id'] not in (306, 307)]
+
+    selected_items = []
+
+    # Check for audio files first
+    audio_items = [item for item in valid_items if item['mime'] and item['mime'].startswith('audio/')]
+    video_items = [item for item in valid_items if item['mime'] and item['mime'].startswith('video/')]
+    image_items = [item for item in valid_items if item['mime'] and item['mime'].startswith('image/')]
+
+    is_video_post = False
+    if audio_items:
+        # Audio post: process the audio file
+        logger.info("Detected audio post. Selecting audio file for analysis.")
+        selected_items = [audio_items[0]]
+    elif video_items:
+        # Video post: download the video file for full analysis via Gemini Files API
+        logger.info("Detected video post. Selecting video file for complete analysis.")
+        selected_items = [video_items[0]]
+        is_video_post = True
+    elif image_items:
+        if len(image_items) > 1:
+            # Gallery post: process multiple images (cap at 8)
+            logger.info("Detected gallery post with %d images. Selecting up to 8 images.", len(image_items))
+            selected_items = image_items[:8]
+        else:
+            # Single photo post
+            logger.info("Detected image post. Selecting photo for analysis.")
+            selected_items = [image_items[0]]
+    else:
+        logger.info("No supported media attachments found. Will use text-only analysis.")
+
+    # 4. Download and process selected items
+    temp_files = []
     try:
-        tags = get_tags_from_gemini(temp_file)
+        for item in selected_items:
+            if not item.get('file'):
+                continue
+            temp_path = download_media_to_temp(item['file'], post_id, item['id'])
+            if temp_path:
+                temp_files.append(temp_path)
+
+        # Fallback to thumbnail image if video download failed
+        if not temp_files and is_video_post and image_items:
+            logger.info("Video download failed. Trying thumbnail image as fallback...")
+            fallback_item = image_items[0]
+            if fallback_item.get('file'):
+                temp_path = download_media_to_temp(fallback_item['file'], post_id, fallback_item['id'])
+                if temp_path:
+                    temp_files.append(temp_path)
+
+        # 5. Call Gemini API
+        tags = get_tags_from_gemini(temp_files, post_title=post_title, post_excerpt=post_excerpt)
+
+        # 6. Assign tags
         if tags:
             if dry_run:
                 logger.info("[Dry Run] Would assign tags to post %s: %s", post_id, tags)
@@ -309,11 +399,14 @@ def tag_single_post(post_id: int, dry_run: bool = False) -> list[str]:
                 logger.info("Tags assigned to post %s: %s", post_id, tags)
         else:
             logger.warning("No tags generated for post %s.", post_id)
+
     finally:
-        try:
-            os.remove(temp_file)
-        except Exception:
-            pass
+        # Clean up all temp files
+        for temp_file in temp_files:
+            try:
+                os.remove(temp_file)
+            except Exception:
+                pass
 
     return tags
 
