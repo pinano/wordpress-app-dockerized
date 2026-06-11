@@ -198,6 +198,39 @@ def download_media_to_temp(relative_path: str, post_id: int, item_id: Optional[i
         return None
 
 
+def optimize_image_resolution(local_path: str) -> str:
+    """
+    Resize image to a maximum dimension of 800px and compress it
+    using ffmpeg to reduce size and minimize safety false positives.
+    Modifies the file in-place.
+    """
+    temp_out = None
+    try:
+        temp_out = local_path + ".opt.jpg"
+        cmd = [
+            config.FFMPEG_PATH or "ffmpeg",
+            "-y",
+            "-i", local_path,
+            "-vf", "scale='min(800,iw)':'min(800,ih)':force_original_aspect_ratio=decrease",
+            "-q:v", "5",
+            temp_out
+        ]
+        logger.info("Optimizing image resolution/quality: %s", local_path)
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+        if os.path.isfile(temp_out) and os.path.getsize(temp_out) > 0:
+            os.replace(temp_out, local_path)
+            logger.info("Successfully optimized image: %s", local_path)
+    except Exception as exc:
+        logger.warning("Failed to optimize image resolution/quality for %s: %s", local_path, exc)
+    finally:
+        if temp_out and os.path.isfile(temp_out):
+            try:
+                os.remove(temp_out)
+            except Exception:
+                pass
+    return local_path
+
+
 # ── Gemini AI ─────────────────────────────────────────────────────────────────
 
 def _build_prompt() -> str:
@@ -437,6 +470,9 @@ def tag_single_post(post_id: int, dry_run: bool = False) -> list[str]:
                 continue
             temp_path = download_media_to_temp(item['file'], post_id, item['id'])
             if temp_path:
+                mime_type = _detect_mime_type(temp_path)
+                if mime_type in _IMAGE_MIME_TYPES:
+                    temp_path = optimize_image_resolution(temp_path)
                 temp_files.append(temp_path)
 
         # Fallback to thumbnail image if video download failed
@@ -446,6 +482,9 @@ def tag_single_post(post_id: int, dry_run: bool = False) -> list[str]:
             if fallback_item.get('file'):
                 temp_path = download_media_to_temp(fallback_item['file'], post_id, fallback_item['id'])
                 if temp_path:
+                    mime_type = _detect_mime_type(temp_path)
+                    if mime_type in _IMAGE_MIME_TYPES:
+                        temp_path = optimize_image_resolution(temp_path)
                     temp_files.append(temp_path)
 
         # 5. Call Gemini API
