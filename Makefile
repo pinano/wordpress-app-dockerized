@@ -208,8 +208,8 @@ $(MAKECMDGOALS):
 				printf "    --dry-run       Analyze and suggest tags without saving.\n" ; \
 				printf "    --post-id <ID>  Tag a single post.\n" ; \
 				;; \
-			"repair-tags") \
-				printf "$(BOLD)make repair-tags$(RESET)\n" ; \
+			"tag-repair") \
+				printf "$(BOLD)make tag-repair$(RESET)\n" ; \
 				printf "  Find all post tags that contain a comma in their name, split them into\n" ; \
 				printf "  individual tags, re-associate them to the posts, and delete the broken tags.\n" ; \
 				printf "  Does not call the Gemini API or consume any tokens.\n" ; \
@@ -318,7 +318,7 @@ help:
 	@printf "  $(CYAN)crontab-init$(RESET)    Create example crontab file\n\n"
 	@printf "$(BOLD)AI Tagging (Gemini)$(RESET)\n"
 	@printf "  $(CYAN)tag-posts$(RESET)       Automatically tag posts using Gemini AI (usage: make tag-posts args=\"--limit 10\")\n"
-	@printf "  $(CYAN)repair-tags$(RESET)     Split comma-separated tags and re-associate them to posts\n"
+	@printf "  $(CYAN)tag-repair$(RESET)     Split comma-separated tags and re-associate them to posts\n"
 	@printf "  $(CYAN)tag-stats$(RESET)       Show statistics of tagged vs untagged posts in the database\n\n"
 	@printf "$(BOLD)Security Management$(RESET)\n"
 	@printf "  $(CYAN)secure$(RESET)            Lock WordPress core files (Read-Only)\n"
@@ -839,8 +839,8 @@ crontab-init:
 tag-posts:
 	@. ./docker/scripts/set-env-vars.sh && docker compose exec bot python3 tagger.py $(args) $(filter-out $@,$(MAKECMDGOALS))
 
-.PHONY: repair-tags
-repair-tags:
+.PHONY: tag-repair
+tag-repair:
 	@. ./docker/scripts/set-env-vars.sh && docker compose exec bot python3 tagger.py --repair
 
 .PHONY: tag-stats
