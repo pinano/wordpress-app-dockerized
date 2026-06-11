@@ -549,6 +549,80 @@ def tag_all_posts(limit: Optional[int] = None, dry_run: bool = False):
     logger.info("Done. %s/%s posts tagged successfully.", processed, len(post_ids))
 
 
+def repair_comma_tags():
+    """
+    Find all post tags that contain a comma in their name, split them into
+    individual tags, re-assign them to the posts, and delete the broken tags.
+    """
+    logger.info("Starting repair of comma-separated tags...")
+    try:
+        # 1. Fetch all tags as JSON
+        import json
+        raw_terms = wp_cli.run("term", "list", "post_tag", "--fields=term_id,name,slug", "--format=json")
+        if not raw_terms:
+            logger.info("No tags found.")
+            return
+        terms = json.loads(raw_terms)
+    except Exception as exc:
+        logger.error("Failed to fetch tags: %s", exc)
+        return
+
+    broken_terms_processed = 0
+    for term in terms:
+        term_id = term.get("term_id")
+        name = term.get("name", "")
+        slug = term.get("slug", "")
+        
+        if "," in name:
+            logger.info("Found broken tag ID %s: '%s'", term_id, name)
+            new_tags = [t.strip() for t in name.split(",") if t.strip()]
+            if not new_tags:
+                continue
+            
+            # 2. Find all posts having this tag
+            try:
+                raw_posts = wp_cli.run("post", "list", f"--tag={slug}", "--field=ID")
+                if raw_posts:
+                    post_ids = [int(pid) for pid in raw_posts.strip().split("\n") if pid.strip().isdigit()]
+                else:
+                    post_ids = []
+            except Exception as exc:
+                logger.error("Failed to query posts for tag %s: %s", slug, exc)
+                continue
+            
+            logger.info("Found %d posts associated with broken tag '%s'", len(post_ids), name)
+            for post_id in post_ids:
+                try:
+                    # Get all tags for this post to avoid losing other valid tags
+                    raw_post_tags = wp_cli.run("post", "term", "list", str(post_id), "post_tag", "--field=name")
+                    if raw_post_tags:
+                        post_tags = [t.strip() for t in raw_post_tags.strip().split("\n") if t.strip()]
+                    else:
+                        post_tags = []
+                    
+                    # Remove the broken tag and merge the new ones
+                    filtered_tags = [t for t in post_tags if t != name]
+                    for nt in new_tags:
+                        if nt not in filtered_tags:
+                            filtered_tags.append(nt)
+                    
+                    # Re-assign tags
+                    wp_cli.run("post", "term", "set", str(post_id), "post_tag", *filtered_tags)
+                    logger.info("Repaired post %s: replaced '%s' with %s", post_id, name, filtered_tags)
+                except Exception as exc:
+                    logger.error("Failed to repair tags for post %s: %s", post_id, exc)
+            
+            # 3. Delete the broken term from WordPress database
+            try:
+                wp_cli.run("term", "delete", "post_tag", str(term_id))
+                logger.info("Deleted broken tag term ID %s", term_id)
+                broken_terms_processed += 1
+            except Exception as exc:
+                logger.error("Failed to delete broken tag term %s: %s", term_id, exc)
+                
+    logger.info("Done. Repaired %d broken tag terms.", broken_terms_processed)
+
+
 # ── CLI entry point ───────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
@@ -560,13 +634,20 @@ if __name__ == "__main__":
         action="store_true",
         help="Suggest tags without modifying the WordPress database.",
     )
+    parser.add_argument(
+        "--repair",
+        action="store_true",
+        help="Split comma-separated tags into separate tags without re-calling Gemini.",
+    )
     args = parser.parse_args()
 
-    if not _get_client():
-        logger.error("Cannot proceed: Gemini client could not be initialized.")
-        sys.exit(1)
-
-    if args.post_id:
+    if args.repair:
+        repair_comma_tags()
+    elif args.post_id:
+        if not _get_client():
+            sys.exit(1)
         tag_single_post(args.post_id, dry_run=args.dry_run)
     else:
+        if not _get_client():
+            sys.exit(1)
         tag_all_posts(limit=args.limit, dry_run=args.dry_run)
