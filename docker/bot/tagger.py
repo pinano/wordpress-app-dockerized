@@ -626,28 +626,32 @@ def repair_comma_tags():
 # ── CLI entry point ───────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Auto-tag WordPress posts using Gemini API.")
-    parser.add_argument("--post-id", type=int, help="Tag a single post by ID.")
-    parser.add_argument("--limit", type=int, help="Limit number of posts in batch mode.")
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Suggest tags without modifying the WordPress database.",
-    )
-    parser.add_argument(
-        "--repair",
-        action="store_true",
-        help="Split comma-separated tags into separate tags without re-calling Gemini.",
-    )
-    args = parser.parse_args()
+    try:
+        parser = argparse.ArgumentParser(description="Auto-tag WordPress posts using Gemini API.")
+        parser.add_argument("--post-id", type=int, help="Tag a single post by ID.")
+        parser.add_argument("--limit", type=int, help="Limit number of posts in batch mode.")
+        parser.add_argument(
+            "--dry-run",
+            action="store_true",
+            help="Suggest tags without modifying the WordPress database.",
+        )
+        parser.add_argument(
+            "--repair",
+            action="store_true",
+            help="Split comma-separated tags into separate tags without re-calling Gemini.",
+        )
+        args = parser.parse_args()
 
-    if args.repair:
-        repair_comma_tags()
-    elif args.post_id:
-        if not _get_client():
-            sys.exit(1)
-        tag_single_post(args.post_id, dry_run=args.dry_run)
-    else:
-        if not _get_client():
-            sys.exit(1)
-        tag_all_posts(limit=args.limit, dry_run=args.dry_run)
+        if args.repair:
+            repair_comma_tags()
+        elif args.post_id:
+            if not _get_client():
+                sys.exit(1)
+            tag_single_post(args.post_id, dry_run=args.dry_run)
+        else:
+            if not _get_client():
+                sys.exit(1)
+            tag_all_posts(limit=args.limit, dry_run=args.dry_run)
+    except KeyboardInterrupt:
+        logger.info("\nExecution interrupted by user (Ctrl+C). Exiting...")
+        sys.exit(130)
