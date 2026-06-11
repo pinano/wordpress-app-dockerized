@@ -124,6 +124,8 @@ services:
       BOT_DOWNLOAD_PATH: /var/bot-media
       BOT_WP_CLI_PATH: /usr/local/bin/wp
       BOT_FFMPEG_PATH: /usr/bin/ffmpeg
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
     logging:
       driver: "json-file"
       options:

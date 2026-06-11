@@ -46,3 +46,7 @@ WP_CLI_PATH: str = os.environ.get("BOT_WP_CLI_PATH", "/usr/local/bin/wp")
 
 # ffmpeg binary path inside the bot container
 FFMPEG_PATH: str = os.environ.get("BOT_FFMPEG_PATH", "/usr/bin/ffmpeg")
+
+# Gemini API
+GEMINI_API_KEY: str = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_MODEL: str = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")

@@ -194,6 +194,14 @@ $(MAKECMDGOALS):
 				printf "$(BOLD)make crontab-init$(RESET)\n" ; \
 				printf "  Create an example crontab file under 'docker/scripts/crontab' if it does not exist.\n" ; \
 				;; \
+			"tag-posts") \
+				printf "$(BOLD)make tag-posts [args=\"...\"]$(RESET)\n" ; \
+				printf "  Tag WordPress posts retroactively using Gemini AI based on their images/videos.\n" ; \
+				printf "  Args:\n" ; \
+				printf "    --limit <N>     Limit to N posts.\n" ; \
+				printf "    --dry-run       Analyze and suggest tags without saving.\n" ; \
+				printf "    --post-id <ID>  Tag a single post.\n" ; \
+				;; \
 			"secure") \
 				printf "$(BOLD)make secure$(RESET)\n" ; \
 				printf "  Lock the WordPress site. Core WordPress files become Read-Only.\n" ; \
@@ -290,6 +298,8 @@ help:
 	@printf "  $(CYAN)size-show$(RESET)       Show current sizing configuration\n\n"
 	@printf "$(BOLD)Cron Management$(RESET)\n"
 	@printf "  $(CYAN)crontab-init$(RESET)    Create example crontab file\n\n"
+	@printf "$(BOLD)AI Tagging (Gemini)$(RESET)\n"
+	@printf "  $(CYAN)tag-posts$(RESET)       Automatically tag posts using Gemini AI (usage: make tag-posts args=\"--limit 10\")\n\n"
 	@printf "$(BOLD)Security Management$(RESET)\n"
 	@printf "  $(CYAN)secure$(RESET)            Lock WordPress core files (Read-Only)\n"
 	@printf "  $(CYAN)insecure$(RESET)          Unlock WordPress core files (Write access for maintenance)\n"
@@ -804,6 +814,11 @@ crontab-init:
 	else \
 		echo "ℹ️  crontab file already exists."; \
 	fi
+
+.PHONY: tag-posts
+tag-posts:
+	@. ./docker/scripts/set-env-vars.sh && docker compose exec bot python3 tagger.py $(args) $(filter-out $@,$(MAKECMDGOALS))
+
 
 # Catch-all target for positional arguments
 %:

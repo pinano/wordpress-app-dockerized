@@ -581,6 +581,29 @@ async def _finish(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     except Exception as exc:
         logger.warning("WP Rocket cache clean failed (non-fatal): %s", exc)
 
+    # AI Tagging via Gemini API (non-fatal, runs in executor to avoid blocking)
+    assigned_tags = []
+    if getattr(config, "GEMINI_API_KEY", None):
+        try:
+            import asyncio
+            import tagger
+            if data.get("status_msg_id"):
+                try:
+                    await context.bot.edit_message_text(
+                        chat_id=update.effective_chat.id,
+                        message_id=data["status_msg_id"],
+                        text="⏳ Generando etiquetas con IA..."
+                    )
+                except Exception:
+                    pass
+            loop = asyncio.get_running_loop()
+            assigned_tags = await loop.run_in_executor(
+                None, tagger.tag_single_post, int(post_id), False
+            )
+        except Exception as exc:
+            logger.exception("AI tagging failed (non-fatal): %s", exc)
+
+
     # Get post URL
     try:
         post_url = wp_cli.run("post", "get", post_id, "--field=guid")
@@ -603,10 +626,14 @@ async def _finish(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if data.get("post_type"):
         lines.append(f"📎 <b>Medio:</b> {data['post_type']}")
     
+    if assigned_tags:
+        lines.append(f"🏷️ <b>Etiquetas (IA):</b> {', '.join(assigned_tags)}")
+    
     if data.get("is_gallery") and data.get("gallery_ids"):
         lines.append(f"🆔 <b>Media IDs:</b> {', '.join(data['gallery_ids'])}")
     elif data.get("media_id"):
         lines.append(f"🆔 <b>Media ID:</b> {data['media_id']}")
+
 
     msg_text = "\n".join(lines)
 

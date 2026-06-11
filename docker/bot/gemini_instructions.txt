@@ -1,0 +1,29 @@
+INSTRUCCIONES GENERALES:
+- Analiza esta imagen o vídeo y genera una lista de etiquetas (tags) descriptivas.
+- Idioma de salida: Español.
+- Cantidad de etiquetas: Devuelve estrictamente entre 3 y 6 etiquetas que mejor describan el contenido principal.
+- Formato de salida: Devuelve únicamente las etiquetas escritas en minúsculas y separadas exclusivamente por comas (por ejemplo: playa,niños,verano).
+- Restricciones: No uses viñetas, guiones, numeración, introducciones ni explicaciones de ningún tipo. No uses nombres propios de personas, ciudades ni marcas (ej. en lugar de "Madrid" usa "ciudad", en lugar de "Pedro" usa "niño"). Evita etiquetas genéricas sin valor como "foto", "video", "imagen".
+
+CATEGORÍAS DE ETIQUETAS A CONSIDERAR:
+
+1. PERSONAS Y COMPOSICIÓN:
+   Si aparecen personas, identifica y añade etiquetas de:
+   - Rango de edad: "bebé" (menos de 1 año), "niño pequeño" (1-3 años), "niño" o "niña" (4-12 años), "adolescente" (13-19 años), "joven" (20-30 años), "adulto" (30-65 años), "abuelo", "abuela" o "anciano" (más de 65 años).
+   - Relación/Grupo: "solo"/"sola" (una persona), "pareja" (dos personas), "familia", "grupo" (tres o más personas), "amigos".
+   - Tipo de toma: "retrato" (primer plano de cara), "selfi".
+
+2. ACTIVIDADES Y HOBBIES:
+   Identifica si están realizando alguna actividad o hobby común:
+   - Deportes: "deporte", "esquí", "ciclismo" (o "bici"), "patinaje" (o "patines"), "tenis", "pádel", "natación" (o "piscina"), "senderismo" (o "caminar"), "gimnasio".
+   - Eventos y ocio: "fiesta", "comida familiar", "cumpleaños", "barbacoa", "concierto", "boda", "excursión", "viaje", "turismo", "juegos de mesa", "manualidades", "lectura".
+
+3. ÉPOCAS DEL AÑO Y FESTIVIDADES:
+   Busca elementos temporales o decorativos:
+   - Estaciones: "invierno" (nieve, abrigos gruesos), "verano" (bañadores, playa, sol fuerte), "primavera" (flores, campos verdes), "otoño" (hojas secas, tonos marrones/dorados).
+   - Festividades: "navidad" (árbol de navidad, luces, regalos), "semana santa" (procesiones, torrijas, vacaciones de primavera), "halloween" (disfraces, calabazas), "año nuevo" (uvas, cotillón, nochevieja), "vacaciones".
+
+4. LUGARES Y ENTORNOS:
+   Identifica con precisión el entorno espacial:
+   - Interiores: "casa" (o "hogar"), "hotel", "salón", "cocina", "restaurante" (o "bar"), "oficina" (o "trabajo"), "colegio".
+   - Exteriores: "pueblo", "ciudad", "parque", "jardín", "playa" (o "mar"), "montaña", "bosque", "piscina", "campo" (o "naturaleza"), "coche" (o "vehículo").
