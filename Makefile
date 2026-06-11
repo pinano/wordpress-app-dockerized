@@ -214,6 +214,12 @@ $(MAKECMDGOALS):
 				printf "  individual tags, re-associate them to the posts, and delete the broken tags.\n" ; \
 				printf "  Does not call the Gemini API or consume any tokens.\n" ; \
 				;; \
+			"tag-stats") \
+				printf "$(BOLD)make tag-stats$(RESET)\n" ; \
+				printf "  Query the WordPress database and show statistics about how many posts\n" ; \
+				printf "  are currently tagged vs untagged.\n" ; \
+				printf "  Does not call the Gemini API or consume any tokens.\n" ; \
+				;; \
 			"secure") \
 				printf "$(BOLD)make secure$(RESET)\n" ; \
 				printf "  Lock the WordPress site. Core WordPress files become Read-Only.\n" ; \
@@ -312,7 +318,8 @@ help:
 	@printf "  $(CYAN)crontab-init$(RESET)    Create example crontab file\n\n"
 	@printf "$(BOLD)AI Tagging (Gemini)$(RESET)\n"
 	@printf "  $(CYAN)tag-posts$(RESET)       Automatically tag posts using Gemini AI (usage: make tag-posts args=\"--limit 10\")\n"
-	@printf "  $(CYAN)repair-tags$(RESET)     Split comma-separated tags and re-associate them to posts\n\n"
+	@printf "  $(CYAN)repair-tags$(RESET)     Split comma-separated tags and re-associate them to posts\n"
+	@printf "  $(CYAN)tag-stats$(RESET)       Show statistics of tagged vs untagged posts in the database\n\n"
 	@printf "$(BOLD)Security Management$(RESET)\n"
 	@printf "  $(CYAN)secure$(RESET)            Lock WordPress core files (Read-Only)\n"
 	@printf "  $(CYAN)insecure$(RESET)          Unlock WordPress core files (Write access for maintenance)\n"
@@ -835,6 +842,10 @@ tag-posts:
 .PHONY: repair-tags
 repair-tags:
 	@. ./docker/scripts/set-env-vars.sh && docker compose exec bot python3 tagger.py --repair
+
+.PHONY: tag-stats
+tag-stats:
+	@. ./docker/scripts/set-env-vars.sh && docker compose exec bot python3 tagger.py --stats
 
 
 # Catch-all target for positional arguments

@@ -623,6 +623,50 @@ def repair_comma_tags():
     logger.info("Done. Repaired %d broken tag terms.", broken_terms_processed)
 
 
+def show_tagging_stats():
+    """
+    Query the WordPress database to show how many posts are tagged vs untagged.
+    """
+    logger.info("Querying tagging statistics via WP-CLI...")
+    try:
+        # We fetch all counts in a single round-trip
+        raw = wp_cli.run(
+            "eval",
+            (
+                "global $wpdb; "
+                "$total = $wpdb->get_var(\"SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type='post' AND post_status='publish'\"); "
+                "$untagged = $wpdb->get_var(\"SELECT COUNT(*) FROM {$wpdb->posts} p "
+                "  WHERE p.post_type='post' AND p.post_status='publish' "
+                "  AND NOT EXISTS ("
+                "    SELECT 1 FROM {$wpdb->term_relationships} tr "
+                "    JOIN {$wpdb->term_taxonomy} tt ON tt.term_taxonomy_id = tr.term_taxonomy_id "
+                "    WHERE tr.object_id = p.ID AND tt.taxonomy = 'post_tag'"
+                "  )\"); "
+                "echo \"$total,$untagged\";"
+            )
+        )
+        if not raw or "," not in raw:
+            logger.error("Failed to parse statistics output.")
+            return
+
+        total_str, untagged_str = raw.strip().split(",")
+        total = int(total_str)
+        untagged = int(untagged_str)
+        tagged = total - untagged
+
+        tagged_pct = (tagged / total * 100) if total > 0 else 0
+        untagged_pct = (untagged / total * 100) if total > 0 else 0
+
+        print("\n=== AI Tagging Statistics ===")
+        print(f"Total published posts:  {total}")
+        print(f"Tagged posts:           {tagged} ({tagged_pct:.1f}%)")
+        print(f"Untagged posts:         {untagged} ({untagged_pct:.1f}%)")
+        print("=============================\n")
+
+    except Exception as exc:
+        logger.error("Failed to fetch tagging statistics: %s", exc)
+
+
 # ── CLI entry point ───────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
@@ -640,10 +684,17 @@ if __name__ == "__main__":
             action="store_true",
             help="Split comma-separated tags into separate tags without re-calling Gemini.",
         )
+        parser.add_argument(
+            "--stats",
+            action="store_true",
+            help="Show the number of tagged and untagged posts in the database.",
+        )
         args = parser.parse_args()
 
         if args.repair:
             repair_comma_tags()
+        elif args.stats:
+            show_tagging_stats()
         elif args.post_id:
             if not _get_client():
                 sys.exit(1)
