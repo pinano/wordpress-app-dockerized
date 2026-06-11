@@ -28,10 +28,11 @@ logger = logging.getLogger("tagger")
 
 # Lazy-load google.genai to avoid crashing if not installed yet
 _genai_client = None
+_genai_client_v1beta = None
 
 
 def _get_client():
-    """Return an initialized Gemini client, or None on failure."""
+    """Return an initialized Gemini client (v1 stable), or None on failure."""
     global _genai_client
     if _genai_client is not None:
         return _genai_client
@@ -43,7 +44,7 @@ def _get_client():
     try:
         from google import genai
         from google.genai import types
-        # Use stable v1 API (v1beta has free-tier quota = 0 on many accounts)
+        # Use stable v1 API
         _genai_client = genai.Client(
             api_key=config.GEMINI_API_KEY,
             http_options=types.HttpOptions(api_version="v1"),
@@ -51,6 +52,29 @@ def _get_client():
         return _genai_client
     except ImportError:
         logger.error("google-genai package is not installed. Please run 'make rebuild bot'.")
+        return None
+
+
+def _get_client_v1beta():
+    """Return an initialized Gemini client (v1beta), or None on failure."""
+    global _genai_client_v1beta
+    if _genai_client_v1beta is not None:
+        return _genai_client_v1beta
+
+    if not config.GEMINI_API_KEY:
+        logger.error("GEMINI_API_KEY is not configured in environment.")
+        return None
+
+    try:
+        from google import genai
+        from google.genai import types
+        # Use v1beta API (required for Files API operations)
+        _genai_client_v1beta = genai.Client(
+            api_key=config.GEMINI_API_KEY,
+            http_options=types.HttpOptions(api_version="v1beta"),
+        )
+        return _genai_client_v1beta
+    except ImportError:
         return None
 
 
@@ -221,7 +245,9 @@ def get_tags_from_gemini(local_file_paths: list[str], post_title: str = "", post
     from google import genai
     from google.genai import types
 
-    client = _get_client()
+    # Dynamically select v1beta for video posts (required by Files API)
+    has_video = any(_detect_mime_type(path) in _VIDEO_MIME_TYPES for path in local_file_paths)
+    client = _get_client_v1beta() if has_video else _get_client()
     if not client:
         return []
 
@@ -276,11 +302,42 @@ def get_tags_from_gemini(local_file_paths: list[str], post_title: str = "", post
 
         contents = parts + [prompt]
 
+        # Configure safety settings to avoid false positives on family photos (e.g. at the beach or kids playing)
+        safety_settings = [
+            types.SafetySetting(
+                category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+                threshold=types.HarmBlockThreshold.BLOCK_NONE,
+            ),
+            types.SafetySetting(
+                category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+                threshold=types.HarmBlockThreshold.BLOCK_NONE,
+            ),
+            types.SafetySetting(
+                category=types.HarmCategory.HARM_CATEGORY_HARASSMENT,
+                threshold=types.HarmBlockThreshold.BLOCK_NONE,
+            ),
+            types.SafetySetting(
+                category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+                threshold=types.HarmBlockThreshold.BLOCK_NONE,
+            ),
+        ]
+        config_obj = types.GenerateContentConfig(safety_settings=safety_settings)
+
         # Retry with backoff on 429 (rate limit) and 503 (overload)
         max_retries = 4
         for attempt in range(max_retries):
             try:
-                response = client.models.generate_content(model=model_name, contents=contents)
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=contents,
+                    config=config_obj
+                )
+                if not response.text:
+                    logger.warning(
+                        "Gemini response text is empty or blocked by safety. Candidates: %s",
+                        response.candidates
+                    )
+                    return []
                 raw = response.text.strip()
                 logger.info("Gemini response: %s", raw)
                 return [t.strip().lower() for t in raw.split(",") if t.strip()]
