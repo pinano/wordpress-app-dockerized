@@ -310,10 +310,16 @@ def get_tags_from_gemini(local_file_paths: list[str], post_title: str = "", post
                 uploaded_file = client.files.upload(file=path)
                 uploaded_files.append(uploaded_file)
 
-                # Wait for processing
-                while uploaded_file.state.name == "PROCESSING":
+                # Wait for processing (with a 2-minute timeout to avoid infinite hangs)
+                checks = 0
+                max_checks = 60
+                while uploaded_file.state.name == "PROCESSING" and checks < max_checks:
                     time.sleep(2)
                     uploaded_file = client.files.get(name=uploaded_file.name)
+                    checks += 1
+                if uploaded_file.state.name == "PROCESSING":
+                    logger.error("Gemini video processing timed out.")
+                    continue
                 if uploaded_file.state.name == "FAILED":
                     logger.error("Gemini failed to process video.")
                     continue
@@ -322,16 +328,21 @@ def get_tags_from_gemini(local_file_paths: list[str], post_title: str = "", post
                     file_uri=uploaded_file.uri, mime_type=uploaded_file.mime_type
                 ))
 
-        # Build prompt
+        # Build prompt with context if available
         prompt = _build_prompt()
-        if not local_file_paths and (post_title or post_excerpt):
+        if post_title or post_excerpt:
+            if not local_file_paths:
+                context_intro = "Analiza el siguiente título y descripción de un post de blog y sugiere etiquetas descriptivas.\n"
+                logger.info("No supported media files found. Falling back to text-based tagging...")
+            else:
+                context_intro = "Además de la imagen o vídeo, utiliza el siguiente título y contenido del post como contexto para generar etiquetas más precisas:\n"
+            
             prompt = (
-                f"Analiza el siguiente título y descripción de un post de blog y sugiere etiquetas descriptivas.\n"
+                f"{context_intro}"
                 f"Título: {post_title}\n"
-                f"Descripción: {post_excerpt}\n\n"
+                f"Contenido: {post_excerpt}\n\n"
                 f"{prompt}"
             )
-            logger.info("No supported media files found. Falling back to text-based tagging...")
 
         contents = parts + [prompt]
 
