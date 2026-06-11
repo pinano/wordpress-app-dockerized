@@ -333,9 +333,13 @@ def get_tags_from_gemini(local_file_paths: list[str], post_title: str = "", post
                     config=config_obj
                 )
                 if not response.text:
+                    try:
+                        resp_dump = response.model_dump_json(exclude_none=True)
+                    except Exception:
+                        resp_dump = str(response)
                     logger.warning(
-                        "Gemini response text is empty or blocked by safety. Candidates: %s",
-                        response.candidates
+                        "Gemini response text is empty or blocked. Full response structure: %s",
+                        resp_dump
                     )
                     return []
                 raw = response.text.strip()
@@ -446,6 +450,11 @@ def tag_single_post(post_id: int, dry_run: bool = False) -> list[str]:
 
         # 5. Call Gemini API
         tags = get_tags_from_gemini(temp_files, post_title=post_title, post_excerpt=post_excerpt)
+
+        # Fallback to text-only if media-based tagging returned no results (e.g. due to safety block on images)
+        if not tags and temp_files:
+            logger.info("Media-based tagging returned no results (possibly blocked by safety filters). Falling back to text-only analysis...")
+            tags = get_tags_from_gemini([], post_title=post_title, post_excerpt=post_excerpt)
 
         # 6. Assign tags
         if tags:
