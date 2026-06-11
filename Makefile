@@ -195,9 +195,15 @@ $(MAKECMDGOALS):
 				printf "  Create an example crontab file under 'docker/scripts/crontab' if it does not exist.\n" ; \
 				;; \
 			"tag-posts") \
-				printf "$(BOLD)make tag-posts [args=\"...\"]$(RESET)\n" ; \
+				printf "$(BOLD)make tag-posts args=\"...\"$(RESET)\n" ; \
 				printf "  Tag WordPress posts retroactively using Gemini AI based on their images/videos.\n" ; \
-				printf "  Args:\n" ; \
+				printf "  Note: Due to GNU Make parsing constraints, all flags starting with '-' or '--'\n" ; \
+				printf "        MUST be wrapped inside args=\"...\".\n" ; \
+				printf "  Examples:\n" ; \
+				printf "    make tag-posts args=\"--limit 10\"\n" ; \
+				printf "    make tag-posts args=\"--post-id <ID>\"\n" ; \
+				printf "    make tag-posts args=\"--post-id <ID> --dry-run\"\n" ; \
+				printf "  Available options within args:\n" ; \
 				printf "    --limit <N>     Limit to N posts.\n" ; \
 				printf "    --dry-run       Analyze and suggest tags without saving.\n" ; \
 				printf "    --post-id <ID>  Tag a single post.\n" ; \
