@@ -1,3 +1,19 @@
+## v2026.06.11 (2026-06-11)
+
+- feat(tagger): avoid infinite loop in video processing and enrich multimodal prompt with title/content context (eb312a8)
+- refactor: rename repair-tags make target to tag-repair for consistency (af2c7fd)
+- feat(tagger): add show_tagging_stats and tag-stats Makefile command to query tagged vs untagged counts (f4f6a83)
+- fix(tagger): catch KeyboardInterrupt and exit cleanly without tracebacks on Ctrl+C (61806f5)
+- feat: add repair-comma-tags utility to split and reassign improperly formatted WordPress tags (c5f057b)
+- feat(tagger): add repair-tags Makefile target to split broken comma-separated tags (0ed870a)
+- fix(tagger): pass tags as separate arguments to wp post term set instead of joined with commas (14f7e45)
+- tagger: downscale and compress images using ffmpeg before sending to Gemini to prevent safety blocks (94507be)
+- tagger: add robust text fallback and detailed response logging on empty/blocked Gemini response (4b524e5)
+- feat: add tag-posts command to Makefile and update documentation for AI-powered retroactive tagging (57ed7fd)
+- feat: implement v1beta client for video processing and add permissive safety settings to Gemini tagger (fc7a66f)
+- refactor: upgrade media processing to support batch analysis and text-based tagging with audio support (6eb8507)
+- feat: integrate Gemini AI tagging functionality to automatically categorize untagged WordPress posts (7f87b9b)
+
 ## v2026.06.04 (2026-06-04)
 
 - feat: enhance check-image-updates script to resolve Dockerfile FROM variables and support filtering via Docker Hub API (e8cf763)
