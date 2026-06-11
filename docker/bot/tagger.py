@@ -500,7 +500,7 @@ def tag_single_post(post_id: int, dry_run: bool = False) -> list[str]:
             if dry_run:
                 logger.info("[Dry Run] Would assign tags to post %s: %s", post_id, tags)
             else:
-                wp_cli.run("post", "term", "set", str(post_id), "post_tag", ",".join(tags))
+                wp_cli.run("post", "term", "set", str(post_id), "post_tag", *tags)
                 logger.info("Tags assigned to post %s: %s", post_id, tags)
         else:
             logger.warning("No tags generated for post %s.", post_id)
