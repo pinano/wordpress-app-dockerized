@@ -1,3 +1,8 @@
+## v2026.06.12 (2026-06-12)
+
+- refactor: rename tag-posts to tag-create and add date-based filtering for post tagging (6e5ba1c)
+- refactor: fetch post data using JSON format to reduce WP-CLI execution overhead (1ea70c1)
+
 ## v2026.06.11 (2026-06-11)
 
 - feat(tagger): avoid infinite loop in video processing and enrich multimodal prompt with title/content context (eb312a8)
