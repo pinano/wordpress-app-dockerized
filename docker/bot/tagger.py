@@ -165,10 +165,14 @@ def get_post_media_info(post_id: int) -> list[dict]:
 def get_post_text_info(post_id: int) -> tuple[str, str]:
     """Get the post title and excerpt/content to fall back on or enrich tagging."""
     try:
-        title = wp_cli.run("post", "get", str(post_id), "--field=post_title").strip()
-        excerpt = wp_cli.run("post", "get", str(post_id), "--field=post_excerpt").strip()
+        raw = wp_cli.run("post", "get", str(post_id), "--fields=post_title,post_excerpt,post_content", "--format=json")
+        if not raw or not raw.strip():
+            return "", ""
+        data = json.loads(raw.strip())
+        title = data.get("post_title", "").strip()
+        excerpt = data.get("post_excerpt", "").strip()
         if not excerpt:
-            excerpt = wp_cli.run("post", "get", str(post_id), "--field=post_content").strip()
+            excerpt = data.get("post_content", "").strip()
             # strip html tags if any
             import re
             excerpt = re.sub('<[^<]+?>', '', excerpt).strip()
