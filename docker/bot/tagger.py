@@ -81,29 +81,42 @@ def _get_client_v1beta():
 
 # ── WP-CLI helpers ────────────────────────────────────────────────────────────
 
-def get_untagged_post_ids() -> list[int]:
-    """Return a list of post IDs that have no tags using a single WP-CLI call."""
+def get_untagged_post_ids(date_filter: Optional[str] = None) -> list[int]:
+    """Return a list of post IDs that have no tags, optionally filtered by date prefix."""
     logger.info("Querying posts with no tags via wp-cli...")
+    
+    date_clause = ""
+    if date_filter:
+        cleaned = "".join(filter(str.isdigit, date_filter))
+        if len(cleaned) == 6:  # YYYYMM
+            year = cleaned[:4]
+            month = cleaned[4:]
+            date_clause = f"AND p.post_date LIKE '{year}-{month}-%' "
+        elif len(cleaned) == 8:  # YYYYMMDD
+            year = cleaned[:4]
+            month = cleaned[4:6]
+            day = cleaned[6:]
+            date_clause = f"AND p.post_date LIKE '{year}-{month}-{day}%' "
+        else:
+            logger.error("Invalid date filter format: '%s'. Must be YYYYMM or YYYYMMDD.", date_filter)
+            return []
+
     try:
-        # We get all post IDs, then filter client-side based on tag absence.
-        # Using wp post list with --tag__not_in requires a term ID; simpler to
-        # use a raw SQL query via wp eval, which is a single round-trip.
-        raw = wp_cli.run(
-            "eval",
-            (
-                "global $wpdb; "
-                "$ids = $wpdb->get_col("
-                "  \"SELECT p.ID FROM {$wpdb->posts} p "
-                "  WHERE p.post_type='post' AND p.post_status='publish' "
-                "  AND NOT EXISTS ("
-                "    SELECT 1 FROM {$wpdb->term_relationships} tr "
-                "    JOIN {$wpdb->term_taxonomy} tt ON tt.term_taxonomy_id = tr.term_taxonomy_id "
-                "    WHERE tr.object_id = p.ID AND tt.taxonomy = 'post_tag'"
-                "  ) ORDER BY p.post_date DESC\""
-                "); "
-                "echo implode(',', $ids);"
-            ),
+        # We build the raw SQL query with the optional date filter clause
+        query = (
+            "global $wpdb; "
+            "$ids = $wpdb->get_col("
+            "  \"SELECT p.ID FROM {$wpdb->posts} p "
+            f"  WHERE p.post_type='post' AND p.post_status='publish' {date_clause}"
+            "  AND NOT EXISTS ("
+            "    SELECT 1 FROM {$wpdb->term_relationships} tr "
+            "    JOIN {$wpdb->term_taxonomy} tt ON tt.term_taxonomy_id = tr.term_taxonomy_id "
+            "    WHERE tr.object_id = p.ID AND tt.taxonomy = 'post_tag'"
+            "  ) ORDER BY p.post_date DESC\""
+            "); "
+            "echo implode(',', $ids);"
         )
+        raw = wp_cli.run("eval", query)
         if not raw or not raw.strip():
             return []
         return [int(x) for x in raw.strip().split(",") if x.strip().isdigit()]
@@ -531,12 +544,12 @@ def tag_single_post(post_id: int, dry_run: bool = False) -> list[str]:
     return tags
 
 
-def tag_all_posts(limit: Optional[int] = None, dry_run: bool = False):
+def tag_all_posts(limit: Optional[int] = 10, dry_run: bool = False, date_filter: Optional[str] = None):
     """
     Find all published posts without tags, then process them up to `limit`.
     Respects the Gemini Free Tier rate limit with a delay between calls.
     """
-    post_ids = get_untagged_post_ids()
+    post_ids = get_untagged_post_ids(date_filter=date_filter)
     logger.info("Found %s posts with no tags.", len(post_ids))
 
     if not post_ids:
@@ -688,7 +701,17 @@ if __name__ == "__main__":
     try:
         parser = argparse.ArgumentParser(description="Auto-tag WordPress posts using Gemini API.")
         parser.add_argument("--post-id", type=int, help="Tag a single post by ID.")
-        parser.add_argument("--limit", type=int, help="Limit number of posts in batch mode.")
+        parser.add_argument(
+            "--limit",
+            type=int,
+            default=10,
+            help="Limit number of posts in batch mode. Set to 0 for no limit. Default: 10."
+        )
+        parser.add_argument(
+            "--date",
+            type=str,
+            help="Filter untagged posts by publication date (YYYYMM or YYYYMMDD)."
+        )
         parser.add_argument(
             "--dry-run",
             action="store_true",
@@ -717,7 +740,8 @@ if __name__ == "__main__":
         else:
             if not _get_client():
                 sys.exit(1)
-            tag_all_posts(limit=args.limit, dry_run=args.dry_run)
+            limit = args.limit if args.limit > 0 else None
+            tag_all_posts(limit=limit, dry_run=args.dry_run, date_filter=args.date)
     except KeyboardInterrupt:
         logger.info("\nExecution interrupted by user (Ctrl+C). Exiting...")
         sys.exit(130)

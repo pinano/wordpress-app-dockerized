@@ -43,7 +43,7 @@ make validate                      # Validate .env before starting
 make sync                          # Sync .env with .env.dist (adds missing keys)
 make open-ports / close-ports      # Open/close DB+SFTP to the outside (0.0.0.0 vs 172.17.0.1/127.0.0.1)
 make size-small/medium/large       # Apply resource profiles to .env
-make tag-posts args="..."          # Automatically tag posts retroactively using Gemini AI
+make tag-create args="..."         # Automatically tag posts retroactively using Gemini AI
 ```
 
 ### 🛡️ WordPress Hardening & Permissions

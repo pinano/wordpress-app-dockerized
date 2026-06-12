@@ -194,17 +194,20 @@ $(MAKECMDGOALS):
 				printf "$(BOLD)make crontab-init$(RESET)\n" ; \
 				printf "  Create an example crontab file under 'docker/scripts/crontab' if it does not exist.\n" ; \
 				;; \
-			"tag-posts") \
-				printf "$(BOLD)make tag-posts args=\"...\"$(RESET)\n" ; \
+			"tag-create") \
+				printf "$(BOLD)make tag-create args=\"...\"$(RESET)\n" ; \
 				printf "  Tag WordPress posts retroactively using Gemini AI based on their images/videos.\n" ; \
 				printf "  Note: Due to GNU Make parsing constraints, all flags starting with '-' or '--'\n" ; \
 				printf "        MUST be wrapped inside args=\"...\".\n" ; \
 				printf "  Examples:\n" ; \
-				printf "    make tag-posts args=\"--limit 10\"\n" ; \
-				printf "    make tag-posts args=\"--post-id <ID>\"\n" ; \
-				printf "    make tag-posts args=\"--post-id <ID> --dry-run\"\n" ; \
+				printf "    make tag-create\n" ; \
+				printf "    make tag-create args=\"--limit 10\"\n" ; \
+				printf "    make tag-create args=\"--date 202504\"\n" ; \
+				printf "    make tag-create args=\"--post-id <ID>\"\n" ; \
+				printf "    make tag-create args=\"--post-id <ID> --dry-run\"\n" ; \
 				printf "  Available options within args:\n" ; \
-				printf "    --limit <N>     Limit to N posts.\n" ; \
+				printf "    --limit <N>     Limit to N posts (default: 10, set to 0 for no limit).\n" ; \
+				printf "    --date <YYYYMM> Filter posts by year and month (or YYYYMMDD for a specific day).\n" ; \
 				printf "    --dry-run       Analyze and suggest tags without saving.\n" ; \
 				printf "    --post-id <ID>  Tag a single post.\n" ; \
 				;; \
@@ -317,7 +320,7 @@ help:
 	@printf "$(BOLD)Cron Management$(RESET)\n"
 	@printf "  $(CYAN)crontab-init$(RESET)    Create example crontab file\n\n"
 	@printf "$(BOLD)AI Tagging (Gemini)$(RESET)\n"
-	@printf "  $(CYAN)tag-posts$(RESET)       Automatically tag posts using Gemini AI (usage: make tag-posts args=\"--limit 10\")\n"
+	@printf "  $(CYAN)tag-create$(RESET)      Automatically tag posts using Gemini AI (usage: make tag-create args=\"--limit 10\")\n"
 	@printf "  $(CYAN)tag-repair$(RESET)     Split comma-separated tags and re-associate them to posts\n"
 	@printf "  $(CYAN)tag-stats$(RESET)       Show statistics of tagged vs untagged posts in the database\n\n"
 	@printf "$(BOLD)Security Management$(RESET)\n"
@@ -835,8 +838,8 @@ crontab-init:
 		echo "ℹ️  crontab file already exists."; \
 	fi
 
-.PHONY: tag-posts
-tag-posts:
+.PHONY: tag-create
+tag-create:
 	@. ./docker/scripts/set-env-vars.sh && docker compose exec bot python3 tagger.py $(args) $(filter-out $@,$(MAKECMDGOALS))
 
 .PHONY: tag-repair
