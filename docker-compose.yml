@@ -115,6 +115,7 @@ services:
       - /etc/localtime:/etc/localtime:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - bot-media:/var/bot-media
+      - ./docker/bot:/app
     environment:
       TZ: ${TZ}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}

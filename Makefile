@@ -61,6 +61,14 @@ $(MAKECMDGOALS):
 				printf "  Validate and render the active Docker Compose configuration.\n" ; \
 				printf "  Displays the parsed docker-compose file with environment variables expanded.\n" ; \
 				;; \
+			"validate") \
+				printf "$(BOLD)make validate$(RESET)\n" ; \
+				printf "  Validate .env configuration keys, security settings, and mandatory credentials.\n" ; \
+				;; \
+			"sync") \
+				printf "$(BOLD)make sync$(RESET)\n" ; \
+				printf "  Synchronize .env with .env.dist template, adding any missing variables.\n" ; \
+				;; \
 			"start") \
 				printf "$(BOLD)make start$(RESET)\n" ; \
 				printf "  Start the Docker stack in the background.\n" ; \
@@ -223,6 +231,16 @@ $(MAKECMDGOALS):
 				printf "  are currently tagged vs untagged.\n" ; \
 				printf "  Does not call the Gemini API or consume any tokens.\n" ; \
 				;; \
+			"media-dates-check") \
+				printf "$(BOLD)make media-dates-check$(RESET)\n" ; \
+				printf "  Audit the WordPress database to check date synchronization between\n" ; \
+				printf "  each published post and all its associated media attachments.\n" ; \
+				;; \
+			"media-dates-repair") \
+				printf "$(BOLD)make media-dates-repair [args=\"...\"]$(RESET)\n" ; \
+				printf "  Synchronize publication dates of media attachments with their parent posts.\n" ; \
+				printf "  Options: args=\"--dry-run\" (simulate), args=\"--include-shared\" (include shared media).\n" ; \
+				;; \
 			"secure") \
 				printf "$(BOLD)make secure$(RESET)\n" ; \
 				printf "  Lock the WordPress site. Core WordPress files become Read-Only.\n" ; \
@@ -283,60 +301,64 @@ help:
 	@printf "$(BOLD)Usage:$(RESET) make [target] [service]\n"
 	@printf "For detailed help on any command, run: make <target> help\n\n"
 	@printf "$(BOLD)General$(RESET)\n"
-	@printf "  $(CYAN)help$(RESET)            Show this help message\n"
-	@printf "  $(CYAN)doctor$(RESET)          Run diagnostic checks (port conflicts, host transparent huge pages)\n"
-	@printf "  $(CYAN)status$(RESET)          Show stack status (docker compose ps)\n"
-	@printf "  $(CYAN)services$(RESET)        List available services\n"
-	@printf "  $(CYAN)config$(RESET)          Validate Docker Compose configuration\n\n"
+	@printf "  $(CYAN)help$(RESET)                Show this help message\n"
+	@printf "  $(CYAN)doctor$(RESET)              Run diagnostic checks (port conflicts, host transparent huge pages)\n"
+	@printf "  $(CYAN)status$(RESET)              Show stack status (docker compose ps)\n"
+	@printf "  $(CYAN)services$(RESET)            List available services\n"
+	@printf "  $(CYAN)config$(RESET)              Validate Docker Compose configuration\n"
+	@printf "  $(CYAN)validate$(RESET)            Validate .env configuration keys and requirements\n"
+	@printf "  $(CYAN)sync$(RESET)                Synchronize .env with .env.dist template\n\n"
 	@printf "$(BOLD)Core Lifecycle$(RESET)\n"
-	@printf "  $(CYAN)start$(RESET)           Start the stack (creates, syncs & validates .env if missing)\n"
-	@printf "  $(CYAN)stop$(RESET)            Stop the stack and remove orphans\n"
-	@printf "  $(CYAN)restart$(RESET)         Restart the stack\n"
-	@printf "  $(CYAN)rebuild$(RESET)         Rebuild services from Dockerfile (usage: make rebuild [service])\n"
-	@printf "  $(CYAN)pull$(RESET)            Pull latest images\n"
-	@printf "  $(CYAN)clean$(RESET)           Clean up everything, removing volumes (requires confirmation)\n\n"
+	@printf "  $(CYAN)start$(RESET)               Start the stack (creates, syncs & validates .env if missing)\n"
+	@printf "  $(CYAN)stop$(RESET)                Stop the stack and remove orphans\n"
+	@printf "  $(CYAN)restart$(RESET)             Restart the stack\n"
+	@printf "  $(CYAN)rebuild$(RESET)             Rebuild services from Dockerfile (usage: make rebuild [service])\n"
+	@printf "  $(CYAN)pull$(RESET)                Pull latest images\n"
+	@printf "  $(CYAN)clean$(RESET)               Clean up everything, removing volumes (requires confirmation)\n\n"
 	@printf "$(BOLD)Shell & Logs$(RESET)\n"
-	@printf "  $(CYAN)shell$(RESET)           Open a shell in a container (usage: make shell [service], default: app)\n"
-	@printf "  $(CYAN)logs$(RESET)            Follow logs for all containers or a specific service (usage: make logs [service])\n"
-	@printf "  $(CYAN)logs-slow$(RESET)       Follow PHP-FPM slow request logs in real-time\n\n"
+	@printf "  $(CYAN)shell$(RESET)               Open a shell in a container (usage: make shell [service], default: app)\n"
+	@printf "  $(CYAN)logs$(RESET)                Follow logs for all containers or a specific service (usage: make logs [service])\n"
+	@printf "  $(CYAN)logs-slow$(RESET)           Follow PHP-FPM slow request logs in real-time\n\n"
 	@printf "$(BOLD)Database & Tools$(RESET)\n"
-	@printf "  $(CYAN)db$(RESET)              DB Tools (console, import, export). Run 'make db', 'make db import <file>', 'make db export'\n"
-	@printf "  $(CYAN)db-root$(RESET)         Access database console as root user\n"
-	@printf "  $(CYAN)php-info$(RESET)        Show active PHP configuration in the container\n"
-	@printf "  $(CYAN)opcache-clear$(RESET)   Clear OPcache for PHP-FPM pool (zero-downtime flush)\n"
-	@printf "  $(CYAN)ctop$(RESET)            Monitor containers using ctop\n\n"
+	@printf "  $(CYAN)db$(RESET)                  DB Tools (console, import, export). Run 'make db', 'make db import <file>', 'make db export'\n"
+	@printf "  $(CYAN)db-root$(RESET)             Access database console as root user\n"
+	@printf "  $(CYAN)php-info$(RESET)            Show active PHP configuration in the container\n"
+	@printf "  $(CYAN)opcache-clear$(RESET)       Clear OPcache for PHP-FPM pool (zero-downtime flush)\n"
+	@printf "  $(CYAN)ctop$(RESET)                Monitor containers using ctop\n\n"
 	@printf "$(BOLD)Port Management$(RESET)\n"
-	@printf "  $(CYAN)open-ports$(RESET)      Open DB ($(DB_PORT)) & SFTP ($(SFTP_PORT)) ports to the outside world (0.0.0.0)\n"
-	@printf "  $(CYAN)close-ports$(RESET)     Close DB ($(DB_PORT)) & SFTP ($(SFTP_PORT)) ports (restrict DB to 172.17.0.1, SFTP to 127.0.0.1)\n"
-	@printf "  $(CYAN)open-db$(RESET)         Open only DB port ($(DB_PORT))\n"
-	@printf "  $(CYAN)close-db$(RESET)        Close only DB port ($(DB_PORT))\n"
-	@printf "  $(CYAN)open-sftp$(RESET)       Open only SFTP port ($(SFTP_PORT))\n"
-	@printf "  $(CYAN)close-sftp$(RESET)      Close only SFTP port ($(SFTP_PORT))\n\n"
+	@printf "  $(CYAN)open-ports$(RESET)          Open DB ($(DB_PORT)) & SFTP ($(SFTP_PORT)) ports to the outside world (0.0.0.0)\n"
+	@printf "  $(CYAN)close-ports$(RESET)         Close DB ($(DB_PORT)) & SFTP ($(SFTP_PORT)) ports (restrict DB to 172.17.0.1, SFTP to 127.0.0.1)\n"
+	@printf "  $(CYAN)open-db$(RESET)             Open only DB port ($(DB_PORT))\n"
+	@printf "  $(CYAN)close-db$(RESET)            Close only DB port ($(DB_PORT))\n"
+	@printf "  $(CYAN)open-sftp$(RESET)           Open only SFTP port ($(SFTP_PORT))\n"
+	@printf "  $(CYAN)close-sftp$(RESET)          Close only SFTP port ($(SFTP_PORT))\n\n"
 	@printf "$(BOLD)Sizing Profiles$(RESET)\n"
-	@printf "  $(CYAN)size-small$(RESET)      Configure .env for low-traffic app (< 500 visits/day)\n"
-	@printf "  $(CYAN)size-medium$(RESET)     Configure .env for medium-traffic app (500-5000 visits/day)\n"
-	@printf "  $(CYAN)size-large$(RESET)      Configure .env for high-traffic app (> 5000 visits/day)\n"
-	@printf "  $(CYAN)size-show$(RESET)       Show current sizing configuration\n\n"
+	@printf "  $(CYAN)size-small$(RESET)          Configure .env for low-traffic app (< 500 visits/day)\n"
+	@printf "  $(CYAN)size-medium$(RESET)         Configure .env for medium-traffic app (500-5000 visits/day)\n"
+	@printf "  $(CYAN)size-large$(RESET)          Configure .env for high-traffic app (> 5000 visits/day)\n"
+	@printf "  $(CYAN)size-show$(RESET)           Show current sizing configuration\n\n"
 	@printf "$(BOLD)Cron Management$(RESET)\n"
-	@printf "  $(CYAN)crontab-init$(RESET)    Create example crontab file\n\n"
-	@printf "$(BOLD)AI Tagging (Gemini)$(RESET)\n"
-	@printf "  $(CYAN)tag-create$(RESET)      Automatically tag posts using Gemini AI (usage: make tag-create args=\"--limit 10\")\n"
-	@printf "  $(CYAN)tag-repair$(RESET)     Split comma-separated tags and re-associate them to posts\n"
-	@printf "  $(CYAN)tag-stats$(RESET)       Show statistics of tagged vs untagged posts in the database\n\n"
+	@printf "  $(CYAN)crontab-init$(RESET)        Create example crontab file\n\n"
+	@printf "$(BOLD)AI Tagging & Media Coherence$(RESET)\n"
+	@printf "  $(CYAN)tag-create$(RESET)          Automatically tag posts using Gemini AI (usage: make tag-create args=\"--limit 10\")\n"
+	@printf "  $(CYAN)tag-repair$(RESET)          Split comma-separated tags and re-associate them to posts\n"
+	@printf "  $(CYAN)tag-stats$(RESET)           Show statistics of tagged vs untagged posts in the database\n"
+	@printf "  $(CYAN)media-dates-check$(RESET)   Audit date synchronization between posts and media attachments\n"
+	@printf "  $(CYAN)media-dates-repair$(RESET)  Synchronize media attachment dates with parent post dates\n\n"
 	@printf "$(BOLD)Security Management$(RESET)\n"
-	@printf "  $(CYAN)secure$(RESET)            Lock WordPress core files (Read-Only)\n"
-	@printf "  $(CYAN)insecure$(RESET)          Unlock WordPress core files (Write access for maintenance)\n"
-	@printf "  $(CYAN)fix-permissions$(RESET)   Fix ownership and base permissions\n\n"
+	@printf "  $(CYAN)secure$(RESET)              Lock WordPress core files (Read-Only)\n"
+	@printf "  $(CYAN)insecure$(RESET)            Unlock WordPress core files (Write access for maintenance)\n"
+	@printf "  $(CYAN)fix-permissions$(RESET)     Fix ownership and base permissions\n\n"
 	@printf "$(BOLD)Versioning & Updates$(RESET)\n"
-	@printf "  $(CYAN)release$(RESET)         Generate a new CalVer release, update CHANGELOG.md, and create a git tag\n"
-	@printf "  $(CYAN)update$(RESET)          Fetch and safely upgrade the codebase (usage: make update [version=vX])\n"
-	@printf "  $(CYAN)rollback$(RESET)        Interactively list recent tag versions and rollback to a selected one\n"
-	@printf "  $(CYAN)check-updates$(RESET)   Check for Docker image updates in compose files\n"
+	@printf "  $(CYAN)release$(RESET)             Generate a new CalVer release, update CHANGELOG.md, and create a git tag\n"
+	@printf "  $(CYAN)update$(RESET)              Fetch and safely upgrade the codebase (usage: make update [version=vX])\n"
+	@printf "  $(CYAN)rollback$(RESET)            Interactively list recent tag versions and rollback to a selected one\n"
+	@printf "  $(CYAN)check-updates$(RESET)       Check for Docker image updates in compose files\n"
 	@if docker compose config --services 2>/dev/null | grep -q 'redis'; then \
 		printf "\n$(BOLD)Redis Management$(RESET)\n"; \
-		printf "  $(CYAN)redis-info$(RESET)      Show Redis server statistics\n"; \
-		printf "  $(CYAN)redis-monitor$(RESET)   Monitor Redis commands in real-time\n"; \
-		printf "  $(CYAN)redis-ping$(RESET)      Ping Redis server\n"; \
+		printf "  $(CYAN)redis-info$(RESET)          Show Redis server statistics\n"; \
+		printf "  $(CYAN)redis-monitor$(RESET)       Monitor Redis commands in real-time\n"; \
+		printf "  $(CYAN)redis-ping$(RESET)          Ping Redis server\n"; \
 	fi
 	@printf "\n"
 
@@ -849,6 +871,14 @@ tag-repair:
 .PHONY: tag-stats
 tag-stats:
 	@. ./docker/scripts/set-env-vars.sh && docker compose exec bot python3 tagger.py --stats
+
+.PHONY: media-dates-check
+media-dates-check:
+	@. ./docker/scripts/set-env-vars.sh && docker compose exec bot python3 media_date_checker.py $(args) $(filter-out $@,$(MAKECMDGOALS))
+
+.PHONY: media-dates-repair
+media-dates-repair:
+	@. ./docker/scripts/set-env-vars.sh && docker compose exec bot python3 media_date_checker.py --fix $(args) $(filter-out $@,$(MAKECMDGOALS))
 
 
 # Catch-all target for positional arguments

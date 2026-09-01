@@ -44,6 +44,9 @@ make sync                          # Sync .env with .env.dist (adds missing keys
 make open-ports / close-ports      # Open/close DB+SFTP to the outside (0.0.0.0 vs 172.17.0.1/127.0.0.1)
 make size-small/medium/large       # Apply resource profiles to .env
 make tag-create args="..."         # Automatically tag posts retroactively using Gemini AI
+make tag-repair / tag-stats        # Fix comma tags or show tag statistics
+make media-dates-check             # Audit date synchronization between posts and media
+make media-dates-repair [args=".."]# Synchronize media attachment dates with parent posts
 ```
 
 ### 🛡️ WordPress Hardening & Permissions
@@ -121,7 +124,9 @@ GALLERY MODE: TITLE → CONTENT (optional, SKIP) → LOCATION_STATE → MEDIA (m
 │   │   ├── bot.py              # Bot entrypoint
 │   │   ├── blog_handler.py     # Main ConversationHandler (/blog flow)
 │   │   ├── config.py           # Bot config from env vars
+│   │   ├── media_date_checker.py # Date synchronization audit & repair CLI
 │   │   ├── media_processor.py  # FFmpeg (thumb, transcode, audio)
+│   │   ├── tagger.py           # Gemini AI automated post tagging CLI
 │   │   └── wp_cli.py           # docker exec → wp-cli bridge
 │   └── scripts/
 │       ├── crontab             # Scheduled tasks for cron container
@@ -159,4 +164,4 @@ GALLERY MODE: TITLE → CONTENT (optional, SKIP) → LOCATION_STATE → MEDIA (m
 
 ---
 
-*Last Updated: 2026-04-17*
+*Last Updated: 2026-09-01*

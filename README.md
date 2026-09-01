@@ -31,6 +31,7 @@ A modernized Docker stack for running WordPress applications, featuring optimize
 - **Secure by Default**: SFTP restricted to localhost, DB restricted to Docker bridge IP, and read-only WP core file locking.
 - **Traefik Ready**: Integrated labels for Traefik reverse proxy.
 - **Telegram Bot Interface**: Publishing posts directly from your mobile phone without using the REST API (executes commands via `wp-cli`).
+- **AI-Powered Tagging & Media Coherence**: Multimodal retroactive tagging with Gemini AI (`make tag-create`) and full post-to-media date synchronization auditing/repair tools (`make media-dates-check`/`repair`).
 - **Advanced Flexibility**: Built-in support for Redis/Valkey object cache, Xdebug, Cronjobs, and custom PHP/Apache overrides.
 - **Unified Management**: Comprehensive, colorized `Makefile` with detailed target-specific help and environment diagnostics.
 
@@ -112,13 +113,20 @@ To prevent core file hijacking (e.g., malware modifying WordPress core assets), 
 | `make help` | Show general colorized help menu |
 | `make <target> help` | Show target-specific detailed explanation |
 | `make doctor` | Run diagnostic checks (ports conflict, host Transparent Huge Pages status) |
+| `make status` | Show stack status (`docker compose ps`) |
+| `make services` | List available services in Docker Compose |
+| `make config` | Validate and render active Docker Compose configuration |
+| `make validate` | Validate `.env` configuration keys and security requirements |
+| `make sync` | Synchronize `.env` with `.env.dist` template (adds missing keys) |
 | `make start` | Start the stack (initializes, syncs, and validates `.env` if missing) |
 | `make stop` | Stop the stack and cleanup orphans |
 | `make restart` | Perform clean restart (equivalent to stop + start) |
-| `make rebuild <service>` | Rebuild Docker images for the stack (e.g. `make rebuild app`) |
-| `make status` | Show stack status (`docker compose ps`) |
+| `make rebuild [service]` | Rebuild Docker images for the stack (e.g. `make rebuild app`) |
+| `make pull` | Pull latest base Docker images |
+| `make clean` | Remove containers, networks, and persistent database volumes (with confirmation) |
 | `make logs [service]` | Follow logs for all containers or a specific service (e.g. `make logs bot`) |
 | `make logs wordpress` | Tail WordPress application debug log directly |
+| `make logs-slow` | Follow PHP-FPM slow request logs in real-time |
 | `make shell [service]` | Open terminal inside container (defaults to `app`) |
 | `make db` | Access MariaDB console as regular user |
 | `make db-root` | Access database console as `root` user |
@@ -128,13 +136,23 @@ To prevent core file hijacking (e.g., malware modifying WordPress core assets), 
 | `make php-info` | Display active PHP configuration settings in the running container |
 | `make ctop` | Monitor project containers in real-time using ctop |
 | `make open-ports` / `close-ports` | Open/close DB and SFTP ports externally (0.0.0.0 vs restricted) |
+| `make open-db` / `close-db` | Open/close only DB port (33002) |
+| `make open-sftp` / `close-sftp` | Open/close only SFTP port (22002) |
+| `make crontab-init` | Create example crontab file under `docker/scripts/crontab` |
+| `make tag-create [args="..."]` | Tag WordPress posts retroactively using Gemini AI (e.g. `args="--limit 10"`) |
+| `make tag-repair` | Fix and split comma-separated tags in the database |
+| `make tag-stats` | Show statistics of tagged vs untagged posts |
+| `make media-dates-check` | Audit date synchronization between posts and media attachments |
+| `make media-dates-repair [args="..."]` | Synchronize media attachment dates with parent post dates |
+| `make secure` / `insecure` | Lock (Read-only) / Unlock (Writable) WordPress core files |
+| `make fix-permissions` | Restore standard file ownership and permissions |
 | `make release` | Generate a new CalVer release, update CHANGELOG.md, and create a git tag |
 | `make update [version=X]` | Checkout and upgrade codebase to a specific version or latest tag |
 | `make rollback` | Interactively select and roll back codebase to a prior tag |
+| `make check-updates` | Check for Docker image updates in compose files |
 | `make size-small` / `medium` / `large` | Apply sizing resource profiles |
 | `make size-show` | Show active sizing resource allocations |
-| `make secure` / `insecure` | Lock (Read-only) / Unlock (Writable) WordPress core files |
-| `make fix-permissions` | Restore standard file ownership and permissions |
+| `make redis-info` / `redis-monitor` / `redis-ping` | Inspect and monitor Valkey/Redis cache server |
 
 ---
 
