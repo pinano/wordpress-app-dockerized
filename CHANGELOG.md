@@ -1,3 +1,7 @@
+## v2026.09.01 (2026-09-01)
+
+- feat: add media date audit and repair tools with Makefile integration (276b076)
+
 ## v2026.06.12 (2026-06-12)
 
 - refactor: rename tag-posts to tag-create and add date-based filtering for post tagging (6e5ba1c)
