@@ -1,3 +1,7 @@
+## v2026.09.05 (2026-09-05)
+
+- feat: modernize stack, harden security, enhance performance and multi-PHP support (7012131)
+
 ## v2026.09.01 (2026-09-01)
 
 - feat: add media date audit and repair tools with Makefile integration (276b076)
