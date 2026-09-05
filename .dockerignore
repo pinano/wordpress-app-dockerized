@@ -22,3 +22,10 @@ docroot/
 .DS_Store
 *.swp
 *~
+
+# Database dumps, backups & Python virtualenv / cache
+*.sql
+backups/
+.venv/
+__pycache__/
+*.py[cod]

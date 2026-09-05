@@ -32,7 +32,7 @@ fi
 if git rev-parse "v$VERSION" >/dev/null 2>&1; then
     # We need a micro version, e.g. 2026.05.23.1
     LATEST_TAG=$(git tag -l "v$VERSION*" --sort=-v:refname | head -n 1)
-    if [ "$LATEST_TAG" == "v$VERSION" ]; then
+    if [ "$LATEST_TAG" = "v$VERSION" ]; then
         VERSION="$VERSION.1"
     else
         # Extract the micro version and increment it

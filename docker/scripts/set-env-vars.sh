@@ -33,12 +33,21 @@ if [ -f "$ENV_PATH" ]; then
     case "$line" in
       ''|'#'*) continue ;;
     esac
+    # Strip leading 'export ' if present
+    case "$line" in
+      export\ *) line="${line#export }" ;;
+    esac
     # Split on first '=' only, preserving everything after it as the value
     key="${line%%=*}"
     val="${line#*=}"
     # Skip malformed lines (no key or key contains spaces)
     case "$key" in
-      *' '*|*'	'*|'') continue ;;
+      *' '*|*'\t'*|'') continue ;;
+    esac
+    val=$(printf '%s' "$val" | tr -d '\r')
+    case "$val" in
+      \"*\") val="${val#\"}"; val="${val%\"}" ;;
+      \'*\') val="${val#\'}"; val="${val%\'}" ;;
     esac
     export "$key=$val"
   done < "$ENV_PATH"

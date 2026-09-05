@@ -11,17 +11,27 @@ def _parse_user_map(raw: str) -> dict[int, int]:
         pair = pair.strip()
         if not pair:
             continue
-        tg, wp = pair.split(":")
-        result[int(tg.strip())] = int(wp.strip())
+        if ":" not in pair:
+            continue
+        parts = pair.split(":", 1)
+        try:
+            result[int(parts[0].strip())] = int(parts[1].strip())
+        except ValueError:
+            continue
     return result
 
 
 def _parse_allowed_users(raw: str) -> set[int]:
-    return {int(uid.strip()) for uid in raw.split(",") if uid.strip()}
+    result = set()
+    for uid in raw.split(","):
+        uid = uid.strip()
+        if uid.isdigit():
+            result.add(int(uid))
+    return result
 
 
 # Telegram
-TELEGRAM_BOT_TOKEN: str = os.environ["TELEGRAM_BOT_TOKEN"]
+TELEGRAM_BOT_TOKEN: str = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 
 # Comma-separated list of allowed Telegram user IDs
 ALLOWED_USERS: set[int] = _parse_allowed_users(

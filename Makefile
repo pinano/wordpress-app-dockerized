@@ -114,6 +114,14 @@ $(MAKECMDGOALS):
 				printf "  Special: 'make logs wordpress' tails the WordPress debug log file at\n" ; \
 				printf "  /var/www/html/public/wp-content/debug.log.\n" ; \
 				;; \
+			"logs-apache") \
+				printf "$(BOLD)make logs-apache$(RESET)\n" ; \
+				printf "  Follow Apache access and error logs from the 'app' container.\n" ; \
+				;; \
+			"logs-php") \
+				printf "$(BOLD)make logs-php$(RESET)\n" ; \
+				printf "  Follow the PHP-FPM error log file directly (useful to trace PHP errors/exceptions).\n" ; \
+				;; \
 			"logs-slow") \
 				printf "$(BOLD)make logs-slow$(RESET)\n" ; \
 				printf "  Stream PHP-FPM slow request logs in real-time to identify performance bottlenecks.\n" ; \
@@ -318,7 +326,10 @@ help:
 	@printf "$(BOLD)Shell & Logs$(RESET)\n"
 	@printf "  $(CYAN)shell$(RESET)               Open a shell in a container (usage: make shell [service], default: app)\n"
 	@printf "  $(CYAN)logs$(RESET)                Follow logs for all containers or a specific service (usage: make logs [service])\n"
-	@printf "  $(CYAN)logs-slow$(RESET)           Follow PHP-FPM slow request logs in real-time\n\n"
+	@printf "  $(CYAN)logs-apache$(RESET)          Follow Apache access and error logs\n"
+	@printf "  $(CYAN)logs-php$(RESET)             Follow PHP-FPM error log directly\n"
+	@printf "  $(CYAN)logs-slow$(RESET)            Follow PHP-FPM slow request logs in real-time\n\n"
+
 	@printf "$(BOLD)Database & Tools$(RESET)\n"
 	@printf "  $(CYAN)db$(RESET)                  DB Tools (console, import, export). Run 'make db', 'make db import <file>', 'make db export'\n"
 	@printf "  $(CYAN)db-root$(RESET)             Access database console as root user\n"
@@ -394,6 +405,7 @@ start:
 		$(MAKE) --no-print-directory sync || exit 1; \
 	fi
 	@$(MAKE) --no-print-directory validate
+	@docker network inspect traefik >/dev/null 2>&1 || docker network create traefik >/dev/null 2>&1 || true
 	@echo "🐳 Starting containers..."
 	@. ./docker/scripts/set-env-vars.sh && docker compose up -d --remove-orphans
 	@echo "✅ Stack is up!"
@@ -403,8 +415,19 @@ validate:
 	@echo "Validating .env configuration..."
 	@[ -n "$$(grep '^PROJECT_NAME=' .env | cut -d= -f2 | head -1)" ] || \
 		(echo "❌ ERROR: PROJECT_NAME is not set!"; exit 1)
-	@[ -n "$$(grep '^PROJECT_ID=' .env | cut -d= -f2 | head -1)" ] || \
-		(echo "❌ ERROR: PROJECT_ID is not set!"; exit 1)
+	@PID=$$(grep '^PROJECT_ID=' .env | cut -d= -f2 | head -1 | tr -d ' "\r' | tr -d "'"); \
+	if [ -z "$$PID" ]; then \
+		echo "❌ ERROR: PROJECT_ID is not set!"; exit 1; \
+	fi; \
+	case "$$PID" in \
+		*[!0-9]*) echo "❌ ERROR: PROJECT_ID must be a numeric integer!"; exit 1 ;; \
+	esac; \
+	if [ "$$PID" -gt 999 ] || [ "33$$PID" -gt 65535 ]; then \
+		echo "❌ ERROR: PROJECT_ID ($$PID) produces an invalid TCP port (> 65535). Use a 1-3 digit ID (e.g., 001 - 999)."; exit 1; \
+	fi; \
+	if [ "33$$PID" -lt 1024 ]; then \
+		echo "⚠️  WARNING: PROJECT_ID ($$PID) produces privileged host TCP ports (< 1024: DB=33$$PID, SFTP=22$$PID). Consider using 3 digits (e.g. 00$$PID) for high ports (3300$$PID / 2200$$PID)."; \
+	fi
 	@[ -n "$$(grep '^DB_NAME=' .env | cut -d= -f2 | head -1)" ] || \
 		(echo "❌ ERROR: DB_NAME is not set!"; exit 1)
 	@[ -n "$$(grep '^DB_USER=' .env | cut -d= -f2 | head -1)" ] || \
@@ -460,6 +483,16 @@ logs:
 	else \
 		. ./docker/scripts/set-env-vars.sh && docker compose logs -f $$SERVICE; \
 	fi
+
+.PHONY: logs-apache
+logs-apache: _ensure_env
+	@echo "📋 Tailing Apache logs..."
+	@. ./docker/scripts/set-env-vars.sh && docker compose logs -f --tail=100 app
+
+.PHONY: logs-php
+logs-php: _ensure_env
+	@echo "📋 Tailing PHP error log (/var/www/html/tmp/php_errors.log)..."
+	@. ./docker/scripts/set-env-vars.sh && docker compose exec app tail -n 100 -f /var/www/html/tmp/php_errors.log
 
 .PHONY: logs-slow
 logs-slow: _ensure_env

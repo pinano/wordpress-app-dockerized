@@ -1,8 +1,11 @@
 .env
 *.sql
-mariadb_data/*
-docroot/*
+mariadb_data/
+docroot/
+backups/
+.venv/
 __pycache__/
 *.py[cod]
-.venv/
-
+*$py.class
+.DS_Store
+Thumbs.db

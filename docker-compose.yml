@@ -45,6 +45,7 @@ services:
       APACHE_MAX_REQUEST_WORKERS: ${APACHE_MAX_REQUEST_WORKERS:-10}
       # PHP
       PHP_EXTENSION_XDEBUG: ${PHP_EXTENSION_XDEBUG:-0}
+      PHP_XDEBUG_MODE: ${PHP_XDEBUG_MODE:-off}
       PHP_DATE_TIMEZONE: ${TZ}
       PHP_DISPLAY_ERRORS: ${PHP_DISPLAY_ERRORS:-${APP_ENV_PHP_DISPLAY_ERRORS:-Off}}
       PHP_DISPLAY_STARTUP_ERRORS: ${PHP_DISPLAY_STARTUP_ERRORS:-${APP_ENV_PHP_DISPLAY_STARTUP_ERRORS:-Off}}
@@ -158,7 +159,8 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - ./docker/php/custom.ini:/usr/local/etc/php/conf.d/99-custom.ini:ro
-      - ./docker/scripts/crontab:/etc/cron.d/app-cron
+      - ./docker/scripts/crontab:/etc/crontab.template:ro
+      - ./docker/scripts/maintenance.sh:/usr/local/bin/maintenance.sh:ro
       - ./docroot:/var/www/html
       - type: tmpfs
         target: /var/www/html/tmp
@@ -187,14 +189,14 @@ services:
       DB_NAME: ${DB_NAME}
       DB_USER: ${DB_USER}
       DB_PASS: ${DB_PASS}
-    command: sh -c "printenv | grep -E '^(DB_HOST|DB_NAME|DB_USER|DB_PASS|APP_ENV|TZ|PHP_|USER_ID|GROUP_ID)=' > /etc/environment && chown root:root /etc/cron.d/app-cron && chmod 644 /etc/cron.d/app-cron && cron -f"
+    command: sh -c "printenv | grep -v -E '^(PATH|HOME|HOSTNAME|PWD|SHLVL|OLDPWD)=' > /etc/environment && (cat /etc/environment; echo ''; cat /etc/crontab.template; echo '') > /etc/cron.d/app-cron && chown root:root /etc/cron.d/app-cron && chmod 644 /etc/cron.d/app-cron && cron -f"
     restart: unless-stopped
     networks:
       - backnet
 
   # --- MariaDB ---
   db:
-    image: mariadb:12.3.2
+    image: mariadb:12.3.3
     container_name: ${PROJECT_NAME}-db
     profiles: [ "db" ]
     command:
@@ -204,7 +206,6 @@ services:
       - --innodb-buffer-pool-size=${DB_INNODB_BUFFER_POOL_SIZE:-256M}
       - --innodb-log-file-size=${DB_INNODB_LOG_FILE_SIZE:-64M}
       - --innodb-flush-log-at-trx-commit=${DB_INNODB_FLUSH_LOG_AT_TRX_COMMIT:-2}
-      - --innodb-flush-method=O_DIRECT
       - --skip-name-resolve
       - --join-buffer-size=256K
       - --sort-buffer-size=256K
@@ -273,7 +274,7 @@ services:
 
   # --- Optional Redis Cache (Powered by Valkey, requires COMPOSE_PROFILES=redis) ---
   redis:
-    image: valkey/valkey:9.1-alpine3.23
+    image: valkey/valkey:9.1.2-alpine3.24
     container_name: ${PROJECT_NAME}-redis
     profiles: [ "redis" ]
     command: valkey-server --maxmemory 128mb --maxmemory-policy allkeys-lru

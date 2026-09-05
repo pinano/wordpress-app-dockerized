@@ -12,6 +12,11 @@ if [ -z "$ACTION" ]; then
     exit 1
 fi
 
+if [ ! -d "$DOCROOT" ]; then
+    echo "ℹ️  $DOCROOT does not exist yet. Skipping permissions adjustment."
+    exit 0
+fi
+
 # Directories that ALWAYS need write access
 WRITEABLE_DIRS=(
     "$DOCROOT/wp-content/uploads"

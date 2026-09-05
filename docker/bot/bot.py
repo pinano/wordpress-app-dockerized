@@ -5,6 +5,7 @@ Runs in long-polling mode (no webhook needed).
 """
 import logging
 import os
+import sys
 
 from telegram.ext import Application, CommandHandler
 
@@ -33,6 +34,10 @@ async def start(update, context) -> None:
 
 
 def main() -> None:
+    if not config.TELEGRAM_BOT_TOKEN or config.TELEGRAM_BOT_TOKEN == "your_bot_token_here":
+        logger.error("TELEGRAM_BOT_TOKEN is not configured or uses placeholder value. Bot cannot start.")
+        sys.exit(1)
+
     logger.info("Starting bot (polling mode)…")
 
     app = (

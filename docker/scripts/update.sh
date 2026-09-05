@@ -29,7 +29,7 @@ fi
 # Find current checked out tag
 CURRENT_TAG=$(git describe --tags --exact-match 2>/dev/null || true)
 
-if [ "$CURRENT_TAG" == "$LATEST_TAG" ]; then
+if [ "$CURRENT_TAG" = "$LATEST_TAG" ]; then
     echo "Status: You are already running the latest release ($LATEST_TAG)."
     exit 0
 fi
@@ -48,12 +48,15 @@ echo ""
 read -p "Do you want to apply these changes now? [y/N] " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
+    echo "Synchronizing environment configuration..."
+    make sync
     echo "Rebuilding and starting..."
     make rebuild
     make start
     echo "Stack updated successfully!"
 else
     echo "Note: To apply these changes manually later, run:"
+    echo "  make sync"
     echo "  make rebuild"
     echo "  make start"
 fi

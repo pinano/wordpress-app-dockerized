@@ -15,7 +15,7 @@ fi
 CURRENT_TAG=$(git describe --tags --exact-match 2>/dev/null || true)
 
 for i in "${!TAGS[@]}"; do
-    if [ "${TAGS[$i]}" == "$CURRENT_TAG" ]; then
+    if [ "${TAGS[$i]}" = "$CURRENT_TAG" ]; then
         echo "  $((i+1))) ${TAGS[$i]} (Current)"
     else
         echo "  $((i+1))) ${TAGS[$i]}"
@@ -37,7 +37,7 @@ fi
 
 SELECTED_TAG=${TAGS[$((choice-1))]}
 
-if [ "$SELECTED_TAG" == "$CURRENT_TAG" ]; then
+if [ "$SELECTED_TAG" = "$CURRENT_TAG" ]; then
     echo "Status: You are already running $SELECTED_TAG."
     exit 0
 fi
@@ -57,12 +57,15 @@ echo ""
 read -p "Do you want to apply these changes and start the stack now? [y/N] " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
+    echo "Synchronizing environment configuration..."
+    make sync
     echo "Rebuilding and starting..."
     make rebuild
     make start
     echo "Stack updated successfully!"
 else
     echo "Note: To apply these changes manually later, run:"
+    echo "  make sync"
     echo "  make rebuild"
     echo "  make start"
 fi

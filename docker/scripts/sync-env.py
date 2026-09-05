@@ -5,6 +5,14 @@ import os
 env_dist_path = '.env.dist'
 env_path = '.env'
 
+# If not in current working directory, check project root
+if not os.path.exists(env_dist_path):
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(os.path.dirname(script_dir))
+    candidate = os.path.join(project_root, '.env.dist')
+    if os.path.exists(candidate):
+        os.chdir(project_root)
+
 if not os.path.exists(env_dist_path):
     print(f"❌ ERROR: {env_dist_path} not found.")
     sys.exit(1)
@@ -61,9 +69,11 @@ if extra_keys:
     if new_env_lines and new_env_lines[-1] != '\n':
         new_env_lines.append('\n')
         
-    new_env_lines.append('# --- Extra/Deprecated variables from previous .env ---\n')
+    new_env_lines.append('# ===================================================================================\n')
+    new_env_lines.append('# Custom Application Variables (preserved from previous .env)\n')
+    new_env_lines.append('# ===================================================================================\n')
     for key in sorted(extra_keys):
-        new_env_lines.append(f"# {key}={env_vars[key]}\n")
+        new_env_lines.append(f"{key}={env_vars[key]}\n")
 
 # 4. Overwrite .env with the new reconciled layout
 with open(env_path, 'w') as f:
@@ -73,6 +83,6 @@ with open(env_path, 'w') as f:
 for key in missing_keys_added:
     print(f"➕ Added missing key: {key}")
 if extra_keys:
-    print(f"🧹 Commented out {len(extra_keys)} deprecated/extra variables at the bottom of .env")
+    print(f"ℹ️  Preserved {len(extra_keys)} custom/extra variables at the bottom of .env")
 
 print("✅ Synchronized .env with .env.dist successfully.")
