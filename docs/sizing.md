@@ -15,6 +15,26 @@ make size-large   # For high traffic (> 5000 visits/day)
 Always run `make start` or `make restart` to apply environment variable changes to running containers.
 You can view active sizing values easily using `make size-show`.
 
+### Profile Reference Matrix
+
+| Profile | Target Traffic | App CPU / RAM | PHP OPcache | FPM Children / Apache Workers | DB CPU / RAM | DB Buffer Pool | DB Max Conn |
+|---|---|---|---|---|---|---|---|
+| **SMALL** | < 500 visits/day | 0.5 / 256M | 64 MB | 5 | 1.0 / 512M | 128M | 50 |
+| **MEDIUM** | 500 - 5,000 visits/day | 1.0 / 512M | 128 MB | 10 | 2.0 / 1.0G | 256M | 100 |
+| **LARGE** | > 5,000 visits/day | 2.0 / 1.0G | 192 MB | 20 | 4.0 / 2.0G | 512M | 300 |
+
+### Anti-OOM Memory Sizing Rule
+
+Inside the `app` container, memory is shared between:
+1. **PHP OPcache** (fixed shared memory allocation).
+2. **PHP-FPM Worker Pool** (~30-35 MB per active WordPress worker).
+3. **Apache Web Server** (~50-80 MB baseline).
+
+To prevent the Linux kernel from triggering **OOM Killer** (`SIGKILL` on workers, dropped MariaDB sockets, and Traefik 404s), every profile strictly guarantees:
+$$\text{OPcache} + (\text{Workers} \times 35\text{ MB}) + \text{Apache} < \text{APP\_MEMORY}$$
+
+Any traffic spikes exceeding the active worker count safely queue in Apache/FPM (`listen.backlog`) with sub-second delay instead of crashing the container.
+
 ## Critical Warning: SWAP Usage and tmpfs
 
 > [!CAUTION]
