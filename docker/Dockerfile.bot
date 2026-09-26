@@ -16,6 +16,7 @@ ARG GROUP_ID=1000
 #   php-mbstring→ multibyte string handling
 #   php-curl    → HTTP requests
 #   php-zip     → zip archive support
+#   php-gd      → image processing (required by WP-CLI for media import / thumbnails)
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ffmpeg \
@@ -26,6 +27,7 @@ RUN apt-get update \
         php-mbstring \
         php-curl \
         php-zip \
+        php-gd \
     && rm -rf /var/lib/apt/lists/*
 
 # Download and install WP-CLI
