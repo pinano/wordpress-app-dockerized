@@ -1,3 +1,8 @@
+## v2026.09.26 (2026-09-26)
+
+- refactor(bot): elimina docker.sock, wp-cli nativo, endurece recursos y corrige bugs (24c4e6d)
+- perf: reduce memory limits and worker counts across sizing profiles (6665007)
+
 ## v2026.09.05 (2026-09-05)
 
 - feat: modernize stack, harden security, enhance performance and multi-PHP support (7012131)
