@@ -66,7 +66,7 @@ RUN mkdir -p /var/bot-media/photos \
 COPY docker/bot/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-USER ${USER_ID}:${GROUP_ID}
-
+# NOTE: We do NOT set USER here. The entrypoint must run as root to chown
+# the persistent bot-media volume, then it drops privileges before exec.
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["python", "-u", "bot.py"]
