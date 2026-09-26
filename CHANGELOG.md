@@ -1,3 +1,9 @@
+## v2026.09.26.1 (2026-09-26)
+
+- fix(bot): añade php-gd para generación de thumbnails en wp media import (c16fea5)
+- fix(bot): entrypoint corre como root para arreglar permisos del volumen (f2113ba)
+- fix(bot): corrige descarga de media, permisos de volumen y crash en finish (2ea5c6b)
+
 ## v2026.09.26 (2026-09-26)
 
 - refactor(bot): elimina docker.sock, wp-cli nativo, endurece recursos y corrige bugs (24c4e6d)
