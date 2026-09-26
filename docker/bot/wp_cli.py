@@ -1,9 +1,9 @@
 """
-wp_cli.py — Thin wrapper that runs WP-CLI commands via 'docker exec' inside
-the WordPress app container.
+wp_cli.py — Thin wrapper that runs WP-CLI commands natively inside the bot container.
 
-All commands are run as www-data (uid comes from the container) so that file
-ownership matches what WordPress expects.
+Requires PHP-CLI, WP-CLI, and the docroot volume mounted at /var/www/html.
+All commands run as the bot user so that file ownership in shared volumes
+matches the host UID/GID.
 """
 import logging
 import shlex
@@ -21,18 +21,14 @@ def run(
     timeout: int = 120,
 ) -> Optional[str]:
     """
-    Execute: docker exec <WP_CONTAINER> wp <wp_args...>
+    Execute: wp <wp_args...>
     Returns the stripped stdout string when capture=True, else None.
     Raises subprocess.CalledProcessError on non-zero exit.
     """
     cmd = [
-        "docker", "exec",
-        "--user", "www-data",
-        config.WP_CONTAINER,
         config.WP_CLI_PATH,
         *wp_args,
-        "--allow-root",  # harmless when already www-data, required if root
-        "--skip-themes", # speeds up WP-CLI boots significantly
+        "--skip-themes",  # speeds up WP-CLI boots significantly
         "--path=/var/www/html/public",
     ]
 

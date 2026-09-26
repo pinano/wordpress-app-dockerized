@@ -1,20 +1,47 @@
 # Telegram Bot container
 # Python-based, uses python-telegram-bot (long-polling) + ffmpeg for media processing
+# Runs WP-CLI natively (no docker.sock required).
 
-FROM python:3.14.5-slim
+ARG PYTHON_VERSION=3.12
+FROM python:${PYTHON_VERSION}-slim
 
-# Install system dependencies: ffmpeg for media processing, curl for healthcheck/downloads
+ARG USER_ID=1000
+ARG GROUP_ID=1000
+
+# Install system dependencies:
+#   ffmpeg      → media processing
+#   php-cli     → required by WP-CLI
+#   php-mysql   → database connectivity
+#   php-xml     → WordPress XML parsing
+#   php-mbstring→ multibyte string handling
+#   php-curl    → HTTP requests
+#   php-zip     → zip archive support
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ffmpeg \
         curl \
+        php-cli \
+        php-mysql \
+        php-xml \
+        php-mbstring \
+        php-curl \
+        php-zip \
     && rm -rf /var/lib/apt/lists/*
 
-# Install static Docker CLI (needed to run wp-cli via docker exec)
-ENV DOCKERVERSION=27.3.1
-RUN curl -fsSLO https://download.docker.com/linux/static/stable/$(uname -m)/docker-${DOCKERVERSION}.tgz \
-  && tar xzvf docker-${DOCKERVERSION}.tgz --strip 1 -C /usr/local/bin docker/docker \
-  && rm docker-${DOCKERVERSION}.tgz
+# Download and install WP-CLI
+RUN curl -sSfo /usr/local/bin/wp https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar \
+    && chmod +x /usr/local/bin/wp
+
+# Create a non-root user aligned with the host UID/GID so that shared volumes
+# (docroot, bot-media) have coherent ownership between the bot and the app.
+RUN if ! getent group ${GROUP_ID} >/dev/null 2>&1; then \
+        groupadd -g ${GROUP_ID} botuser; \
+    fi \
+    && if ! getent passwd ${USER_ID} >/dev/null 2>&1; then \
+        useradd -u ${USER_ID} -g ${GROUP_ID} -m -s /bin/bash botuser; \
+    else \
+        usermod -g ${GROUP_ID} -d /home/botuser botuser 2>/dev/null || true; \
+    fi
 
 WORKDIR /app
 
@@ -25,13 +52,16 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application source
 COPY docker/bot/ .
 
-# Create working directories
+# Create working directories and set ownership
 RUN mkdir -p /var/bot-media/photos \
              /var/bot-media/videos \
              /var/bot-media/animations \
              /var/bot-media/audio \
              /var/bot-media/voice \
              /var/bot-media/documents \
-             /var/bot-media/thumbnails
+             /var/bot-media/thumbnails \
+    && chown -R ${USER_ID}:${GROUP_ID} /var/bot-media /app
+
+USER ${USER_ID}:${GROUP_ID}
 
 CMD ["python", "-u", "bot.py"]

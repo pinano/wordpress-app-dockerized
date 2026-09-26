@@ -17,25 +17,26 @@ logger = logging.getLogger(__name__)
 def _ffmpeg(*args: str, timeout: int = 300) -> subprocess.CompletedProcess:
     cmd = [config.FFMPEG_PATH, "-y", *args]
     logger.debug("ffmpeg: %s", " ".join(cmd))
-    
-    # Run ffmpeg, piping stderr (ffmpeg uses stderr for normal output/progress)
-    process = subprocess.Popen(cmd, stderr=subprocess.PIPE, text=True)
-    
-    output_lines = []
-    if process.stderr:
-        for line in iter(process.stderr.readline, ""):
-            line_stripped = line.strip()
-            if line_stripped:
-                logger.info("[ffmpeg] %s", line_stripped)
-                output_lines.append(line_stripped)
-                
-    process.wait(timeout=timeout)
-    
-    if process.returncode != 0:
-        logger.error("ffmpeg error (exit %d)", process.returncode)
-        raise subprocess.CalledProcessError(process.returncode, cmd, output="\n".join(output_lines))
-        
-    return process
+
+    result = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+    )
+
+    if result.returncode != 0:
+        logger.error("ffmpeg error (exit %d):\n%s", result.returncode, result.stderr)
+        raise subprocess.CalledProcessError(
+            result.returncode, cmd, output=result.stdout, stderr=result.stderr
+        )
+
+    # Log stderr (info/progress) at debug level
+    if result.stderr:
+        for line in result.stderr.strip().splitlines():
+            logger.debug("[ffmpeg] %s", line)
+
+    return result
 
 
 def extract_thumbnail(video_path: str, thumbnail_path: str, seek: float = 1.0) -> str:
@@ -44,8 +45,6 @@ def extract_thumbnail(video_path: str, thumbnail_path: str, seek: float = 1.0) -
     Returns thumbnail_path.
     """
     Path(thumbnail_path).parent.mkdir(parents=True, exist_ok=True)
-    # Use -vf "scale=1280:-1" to ensure a decent size thumbnail, or just let it be the original size
-    # By default ffmpeg extracts the original resolution frame. We'll add -q:v 2 for high JPEG quality.
     _ffmpeg("-ss", str(seek), "-i", video_path, "-vframes", "1", "-q:v", "2", thumbnail_path)
     return thumbnail_path
 

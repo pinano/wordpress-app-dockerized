@@ -7,10 +7,10 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '${APP_CPUS:-1.0}' # Max cores per project (increase if heavy)
-          memory: ${APP_MEMORY:-512M} # Memory limit
+          cpus: '${APP_CPUS:-0.5}' # Max cores per project (increase if heavy)
+          memory: ${APP_MEMORY:-256M} # Memory limit — aligned with SMALL profile defaults
         reservations:
-          memory: ${APP_MEMORY_RESERVATION:-128M}
+          memory: ${APP_MEMORY_RESERVATION:-64M}
 
     build:
       context: .
@@ -30,7 +30,7 @@ services:
       - type: tmpfs
         target: /var/www/html/tmp
         tmpfs:
-          size: ${APP_TMPFS_SIZE:-128M}
+          size: ${APP_TMPFS_SIZE:-64M}
     environment:
       # System
       TZ: ${TZ}
@@ -42,7 +42,7 @@ services:
       APACHE_DOCUMENT_ROOT: ${APACHE_DOCUMENT_ROOT:-/var/www/html/public}
       APACHE_PROXY_TIMEOUT: ${APACHE_PROXY_TIMEOUT:-1800}
       APACHE_LOG_LEVEL: ${APACHE_LOG_LEVEL:-warn}
-      APACHE_MAX_REQUEST_WORKERS: ${APACHE_MAX_REQUEST_WORKERS:-10}
+      APACHE_MAX_REQUEST_WORKERS: ${APACHE_MAX_REQUEST_WORKERS:-3}
       # PHP
       PHP_EXTENSION_XDEBUG: ${PHP_EXTENSION_XDEBUG:-0}
       PHP_XDEBUG_MODE: ${PHP_XDEBUG_MODE:-off}
@@ -53,20 +53,20 @@ services:
       PHP_MAX_INPUT_VARS: ${PHP_MAX_INPUT_VARS:-3000}
       PHP_POST_MAX_SIZE: ${PHP_POST_MAX_SIZE:-50M}
       PHP_UPLOAD_MAX_FILE_SIZE: ${PHP_UPLOAD_MAX_FILE_SIZE:-10M}
-      PHP_MEMORY_LIMIT: ${PHP_MEMORY_LIMIT:-512M}
+      PHP_MEMORY_LIMIT: ${PHP_MEMORY_LIMIT:-128M}
       PHP_MAX_EXECUTION_TIME: ${PHP_MAX_EXECUTION_TIME:-60}
       # Performance Tuning (Realpath)
       PHP_REALPATH_CACHE_TTL: ${PHP_REALPATH_CACHE_TTL:-7200}
       # Performance Tuning (OPcache)
       PHP_OPCACHE_ENABLE: 1
-      PHP_OPCACHE_MEMORY_CONSUMPTION: ${PHP_OPCACHE_MEMORY_CONSUMPTION:-256}
+      PHP_OPCACHE_MEMORY_CONSUMPTION: ${PHP_OPCACHE_MEMORY_CONSUMPTION:-64}
       PHP_OPCACHE_MAX_ACCELERATED_FILES: ${PHP_OPCACHE_MAX_ACCELERATED_FILES:-20000}
       PHP_OPCACHE_VALIDATE_TIMESTAMPS: ${PHP_OPCACHE_VALIDATE_TIMESTAMPS:-${APP_ENV_PHP_OPCACHE_VALIDATE_TIMESTAMPS:-0}}
       PHP_OPCACHE_REVALIDATE_FREQ: ${PHP_OPCACHE_REVALIDATE_FREQ:-${APP_ENV_PHP_OPCACHE_REVALIDATE_FREQ:-60}}
       PHP_OPCACHE_HUGE_CODE_PAGES: ${PHP_OPCACHE_HUGE_CODE_PAGES:-0}
       PHP_OPCACHE_INTERNED_STRINGS_BUFFER: ${PHP_OPCACHE_INTERNED_STRINGS_BUFFER:-16}
       # PHP-FPM Pool Tuning
-      PHP_FPM_PM_MAX_CHILDREN: ${PHP_FPM_PM_MAX_CHILDREN:-10}
+      PHP_FPM_PM_MAX_CHILDREN: ${PHP_FPM_PM_MAX_CHILDREN:-3}
       PHP_FPM_PM_MAX_REQUESTS: ${PHP_FPM_PM_MAX_REQUESTS:-500}
       PHP_FPM_SLOWLOG_TIMEOUT: ${PHP_FPM_SLOWLOG_TIMEOUT:-10s}
       # Database
@@ -89,6 +89,8 @@ services:
         max-size: "10m"
         max-file: "2"
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     networks:
       - traefik
       - backnet
@@ -112,13 +114,18 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.bot
+      args:
+        - USER_ID=${USER_ID:-1000}
+        - GROUP_ID=${GROUP_ID:-1000}
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
       - bot-media:/var/bot-media
+      - ./docroot:/var/www/html
       - ./docker/bot:/app
     environment:
       TZ: ${TZ}
+      USER_ID: ${USER_ID}
+      GROUP_ID: ${GROUP_ID}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       BOT_ALLOWED_USERS: ${BOT_ALLOWED_USERS}
       BOT_WP_USER_MAP: ${BOT_WP_USER_MAP}
@@ -126,6 +133,10 @@ services:
       BOT_DOWNLOAD_PATH: /var/bot-media
       BOT_WP_CLI_PATH: /usr/local/bin/wp
       BOT_FFMPEG_PATH: /usr/bin/ffmpeg
+      DB_HOST: ${DB_HOST:-db}
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASS}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
     logging:
@@ -134,6 +145,8 @@ services:
         max-size: "10m"
         max-file: "2"
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     networks:
       - backnet
 
@@ -181,7 +194,7 @@ services:
       PHP_ERROR_REPORTING: ${PHP_ERROR_REPORTING:-E_ALL & ~E_NOTICE & ~E_DEPRECATED}
       PHP_MAX_INPUT_VARS: ${PHP_MAX_INPUT_VARS:-3000}
       PHP_MAX_EXECUTION_TIME: 0 # No limit for CLI
-      PHP_MEMORY_LIMIT: ${PHP_MEMORY_LIMIT:-512M}
+      PHP_MEMORY_LIMIT: ${PHP_MEMORY_LIMIT:-128M}
       PHP_OPCACHE_HUGE_CODE_PAGES: ${PHP_OPCACHE_HUGE_CODE_PAGES:-0}
       PHP_OPCACHE_INTERNED_STRINGS_BUFFER: ${PHP_OPCACHE_INTERNED_STRINGS_BUFFER:-16}
       # Database
@@ -191,6 +204,8 @@ services:
       DB_PASS: ${DB_PASS}
     command: sh -c "printenv | grep -v -E '^(PATH|HOME|HOSTNAME|PWD|SHLVL|OLDPWD)=' > /etc/environment && (cat /etc/environment; echo ''; cat /etc/crontab.template; echo '') > /etc/cron.d/app-cron && chown root:root /etc/cron.d/app-cron && chmod 644 /etc/cron.d/app-cron && cron -f"
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     networks:
       - backnet
 

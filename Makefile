@@ -595,9 +595,13 @@ php-info:
 .PHONY: opcache-clear
 opcache-clear: _ensure_env
 	@echo "🧹 Clearing OPcache (PHP-FPM)..."
-	@. ./docker/scripts/set-env-vars.sh && docker compose exec -T app sh -c 'echo "<?php opcache_reset(); echo \"OPcache cleared\n\";" > $${APACHE_DOCUMENT_ROOT:-/var/www/html/public}/opcache_reset_temp.php'
-	@. ./docker/scripts/set-env-vars.sh && docker compose exec -T app curl -s http://localhost:8080/opcache_reset_temp.php || echo "❌ Failed to query OPcache reset script"
-	@. ./docker/scripts/set-env-vars.sh && docker compose exec -T app rm -f $${APACHE_DOCUMENT_ROOT:-/var/www/html/public}/opcache_reset_temp.php
+	@. ./docker/scripts/set-env-vars.sh && docker compose exec -T app sh -c ' \
+		DOCROOT=$${APACHE_DOCUMENT_ROOT:-/var/www/html/public}; \
+		TEMP_FILE="$$DOCROOT/opcache_reset_temp.php"; \
+		echo "<?php opcache_reset(); echo \"OK\\n\";" > "$$TEMP_FILE" || { echo "❌ Cannot write temp file"; exit 1; }; \
+		curl -sf --max-time 10 http://localhost:8080/opcache_reset_temp.php || echo "❌ Failed to query OPcache reset script"; \
+		rm -f "$$TEMP_FILE" \
+	'
 
 .PHONY: doctor
 doctor: _ensure_env
@@ -807,9 +811,9 @@ size-small: _ensure_env
 	$(call set_env,DB_MAX_CONNECTIONS,50)
 	$(call set_env,PHP_MEMORY_LIMIT,128M)
 	$(call set_env,PHP_OPCACHE_MEMORY_CONSUMPTION,64)
-	$(call set_env,APP_TMPFS_SIZE,128M)
-	$(call set_env,APACHE_MAX_REQUEST_WORKERS,5)
-	$(call set_env,PHP_FPM_PM_MAX_CHILDREN,5)
+	$(call set_env,APP_TMPFS_SIZE,64M)
+	$(call set_env,APACHE_MAX_REQUEST_WORKERS,3)
+	$(call set_env,PHP_FPM_PM_MAX_CHILDREN,3)
 	$(call set_env,PHP_FPM_PM_MAX_REQUESTS,500)
 	@echo "✅ SMALL profile applied. Run 'make restart' to apply changes."
 
@@ -829,11 +833,11 @@ size-medium: _ensure_env
 	$(call set_env,DB_INNODB_BUFFER_POOL_SIZE,256M)
 	$(call set_env,DB_INNODB_LOG_FILE_SIZE,64M)
 	$(call set_env,DB_MAX_CONNECTIONS,100)
-	$(call set_env,PHP_MEMORY_LIMIT,256M)
+	$(call set_env,PHP_MEMORY_LIMIT,128M)
 	$(call set_env,PHP_OPCACHE_MEMORY_CONSUMPTION,128)
-	$(call set_env,APP_TMPFS_SIZE,256M)
-	$(call set_env,APACHE_MAX_REQUEST_WORKERS,10)
-	$(call set_env,PHP_FPM_PM_MAX_CHILDREN,10)
+	$(call set_env,APP_TMPFS_SIZE,128M)
+	$(call set_env,APACHE_MAX_REQUEST_WORKERS,6)
+	$(call set_env,PHP_FPM_PM_MAX_CHILDREN,6)
 	$(call set_env,PHP_FPM_PM_MAX_REQUESTS,500)
 	@echo "✅ MEDIUM profile applied. Run 'make restart' to apply changes."
 
@@ -855,9 +859,9 @@ size-large: _ensure_env
 	$(call set_env,DB_MAX_CONNECTIONS,300)
 	$(call set_env,PHP_MEMORY_LIMIT,256M)
 	$(call set_env,PHP_OPCACHE_MEMORY_CONSUMPTION,192)
-	$(call set_env,APP_TMPFS_SIZE,512M)
-	$(call set_env,APACHE_MAX_REQUEST_WORKERS,20)
-	$(call set_env,PHP_FPM_PM_MAX_CHILDREN,20)
+	$(call set_env,APP_TMPFS_SIZE,256M)
+	$(call set_env,APACHE_MAX_REQUEST_WORKERS,10)
+	$(call set_env,PHP_FPM_PM_MAX_CHILDREN,10)
 	$(call set_env,PHP_FPM_PM_MAX_REQUESTS,500)
 	@echo "✅ LARGE profile applied. Run 'make restart' to apply changes."
 
@@ -867,11 +871,11 @@ size-show: _ensure_env
 	DB_MEM=$$(grep '^DB_MEMORY=' .env | cut -d= -f2 | tr -d '"'\''\r '); \
 	FPM_CHILDREN=$$(grep '^PHP_FPM_PM_MAX_CHILDREN=' .env | cut -d= -f2 | tr -d '"'\''\r '); \
 	PROFILE="⚠️  CUSTOM (modified)"; \
-	if [ "$$APP_MEM" = "256M" ] && [ "$$DB_MEM" = "512M" ] && [ "$$FPM_CHILDREN" = "5" ]; then \
+	if [ "$$APP_MEM" = "256M" ] && [ "$$DB_MEM" = "512M" ] && [ "$$FPM_CHILDREN" = "3" ]; then \
 		PROFILE="🟢 SMALL (Low traffic)"; \
-	elif [ "$$APP_MEM" = "512M" ] && [ "$$DB_MEM" = "1G" ] && [ "$$FPM_CHILDREN" = "10" ]; then \
+	elif [ "$$APP_MEM" = "512M" ] && [ "$$DB_MEM" = "1G" ] && [ "$$FPM_CHILDREN" = "6" ]; then \
 		PROFILE="🟡 MEDIUM (Medium traffic)"; \
-	elif [ "$$APP_MEM" = "1G" ] && [ "$$DB_MEM" = "2G" ] && [ "$$FPM_CHILDREN" = "20" ]; then \
+	elif [ "$$APP_MEM" = "1G" ] && [ "$$DB_MEM" = "2G" ] && [ "$$FPM_CHILDREN" = "10" ]; then \
 		PROFILE="🔴 LARGE (High traffic)"; \
 	fi; \
 	echo "📊 Current sizing configuration (Profile: $$PROFILE):"; \

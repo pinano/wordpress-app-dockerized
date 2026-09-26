@@ -40,7 +40,6 @@ import wp_cli
 logger = logging.getLogger(__name__)
 
 # ── Conversation states ──────────────────────────────────────────────────────
-TITLE, CONTENT, MEDIA, DONE = range(4)
 TITLE, CONTENT, LOCATION_STATE, MEDIA = range(4)
 
 MAX_GALLERY_PHOTOS = 15
