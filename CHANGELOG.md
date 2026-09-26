@@ -1,3 +1,7 @@
+## v2026.09.26.2 (2026-09-26)
+
+- fix(bot): corrige zona horaria para evitar "programación perdida" (d0fca3f)
+
 ## v2026.09.26.1 (2026-09-26)
 
 - fix(bot): añade php-gd para generación de thumbnails en wp media import (c16fea5)
