@@ -16,6 +16,7 @@ State machine:
 import logging
 import os
 import re
+from datetime import datetime
 from pathlib import Path
 
 from telegram import (
@@ -215,12 +216,14 @@ async def handle_title(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     data["wp_user"] = wp_user
 
     try:
+        post_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         post_id = wp_cli.run(
             "post", "create",
             f"--post_title={title}",
             "--post-category=sin-categoria",
             f"--post_author={wp_user}",
             "--post_status=publish",
+            f"--post_date={post_date}",
             "--porcelain",
         )
     except Exception as exc:

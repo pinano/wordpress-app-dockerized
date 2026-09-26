@@ -6,6 +6,7 @@ All commands run as the bot user so that file ownership in shared volumes
 matches the host UID/GID.
 """
 import logging
+import os
 import shlex
 import subprocess
 from typing import Optional
@@ -25,7 +26,13 @@ def run(
     Returns the stripped stdout string when capture=True, else None.
     Raises subprocess.CalledProcessError on non-zero exit.
     """
+    # Ensure PHP-CLI uses the same timezone as the container to prevent
+    # WordPress from creating posts with a future date (which triggers
+    # the 'future' / 'missed schedule' status).
+    tz = os.environ.get("TZ", "UTC")
     cmd = [
+        "php",
+        "-d", f"date.timezone={tz}",
         config.WP_CLI_PATH,
         *wp_args,
         "--skip-themes",  # speeds up WP-CLI boots significantly
