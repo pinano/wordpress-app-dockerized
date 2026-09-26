@@ -129,7 +129,7 @@ services:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       BOT_ALLOWED_USERS: ${BOT_ALLOWED_USERS}
       BOT_WP_USER_MAP: ${BOT_WP_USER_MAP}
-      BOT_CONTAINER_NAME: ${PROJECT_NAME}-app
+      BOT_CONTAINER_NAME: app
       BOT_DOWNLOAD_PATH: /var/bot-media
       BOT_WP_CLI_PATH: /usr/local/bin/wp
       BOT_FFMPEG_PATH: /usr/bin/ffmpeg

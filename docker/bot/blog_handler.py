@@ -114,8 +114,13 @@ async def _download_telegram_file(update: Update, context: ContextTypes.DEFAULT_
         tg_file_obj = getattr(msg, msg_type)
 
     tg_file = await context.bot.get_file(tg_file_obj.file_id)
-    # tg_file.file_path looks like "photos/file_XXX.jpg" or "videos/file_XXX.mp4"
-    file_relative_path = tg_file.file_path  # e.g. "photos/file_123.jpg"
+    # tg_file.file_path may be a full URL in newer python-telegram-bot versions.
+    # Extract the relative path, e.g. "photos/file_123.jpg".
+    file_relative_path = tg_file.file_path
+    if file_relative_path.startswith("https://"):
+        from urllib.parse import urlparse
+        parsed = urlparse(file_relative_path)
+        file_relative_path = parsed.path.lstrip("/")
     local_full_path = os.path.join(config.DOWNLOAD_PATH, file_relative_path)
 
     Path(local_full_path).parent.mkdir(parents=True, exist_ok=True)
@@ -670,9 +675,12 @@ async def _finish(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     # Guardar en last_published para el comando /borrar
     # media_ids es ahora una LISTA para soportar galerías
+    raw_media = data.get("media_id", "")
+    media_ids = data.get("gallery_ids") if data.get("is_gallery") else ([raw_media.split()[0]] if raw_media else [])
+
     context.user_data["last_published"] = {
         "post_id": post_id,
-        "media_ids": data.get("gallery_ids") if data.get("is_gallery") else [data.get("media_id", "").split()[0]],
+        "media_ids": media_ids,
         "thumbnail_id": data.get("raw_thumbnail_id")
     }
 

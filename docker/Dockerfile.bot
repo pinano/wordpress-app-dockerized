@@ -62,6 +62,11 @@ RUN mkdir -p /var/bot-media/photos \
              /var/bot-media/thumbnails \
     && chown -R ${USER_ID}:${GROUP_ID} /var/bot-media /app
 
+# Copy entrypoint to fix permissions on the shared bot-media volume at startup
+COPY docker/bot/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 USER ${USER_ID}:${GROUP_ID}
 
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["python", "-u", "bot.py"]
