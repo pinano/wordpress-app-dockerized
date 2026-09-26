@@ -1,3 +1,7 @@
+## v2026.09.26.3 (2026-09-26)
+
+- chore(bot): limpia logs de wp-cli y elimina paths duplicados (c125672)
+
 ## v2026.09.26.2 (2026-09-26)
 
 - fix(bot): corrige zona horaria para evitar "programación perdida" (d0fca3f)
