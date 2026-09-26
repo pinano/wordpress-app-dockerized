@@ -186,7 +186,7 @@ async def _process_date_update(update: Update, context: ContextTypes.DEFAULT_TYP
 
     # Clean WP Rocket cache
     try:
-        wp_cli.run("rocket", "clean", "--confirm", "--path=/var/www/html/public/")
+        wp_cli.run("rocket", "clean", "--confirm")
     except Exception as exc:
         logger.warning("WP Rocket cache clean failed (non-fatal): %s", exc)
 

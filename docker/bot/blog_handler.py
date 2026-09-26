@@ -580,11 +580,7 @@ async def _finish(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     # Clean WP Rocket cache
     try:
-        wp_cli.run(
-            "rocket", "clean",
-            "--confirm",
-            "--path=/var/www/html/public/",
-        )
+        wp_cli.run("rocket", "clean", "--confirm")
     except Exception as exc:
         logger.warning("WP Rocket cache clean failed (non-fatal): %s", exc)
 
@@ -766,7 +762,7 @@ async def borrar_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     # Limpiar caché WP Rocket
     try:
-        wp_cli.run("rocket", "clean", "--confirm", "--path=/var/www/html/public/")
+        wp_cli.run("rocket", "clean", "--confirm")
     except Exception:
         pass
 

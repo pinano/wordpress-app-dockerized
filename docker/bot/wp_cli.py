@@ -49,7 +49,7 @@ def run(
     )
 
     if result.returncode != 0:
-        logger.error(
+        logger.warning(
             "wp-cli failed (exit %d): %s\nstderr: %s",
             result.returncode,
             shlex.join(cmd),
